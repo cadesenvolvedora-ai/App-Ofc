@@ -2,6 +2,7 @@ package com.kinross.relatoriomanutencao;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -24,11 +25,13 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -181,6 +184,65 @@ public class MainActivity extends AppCompatActivity {
     public class AndroidBridge {
 
         @JavascriptInterface
+        public void sendEmailWithPdf(final String recipient, final String subject, final String body, final String base64Pdf, final String filename) {
+            runOnUiThread(() -> {
+                try {
+                    byte[] pdfBytes = android.util.Base64.decode(base64Pdf, android.util.Base64.DEFAULT);
+
+                    // Salva arquivo no diretório de cache acessível pelo FileProvider
+                    File cacheFolder = new File(getCacheDir(), "relatorios_pdf");
+                    if (!cacheFolder.exists()) {
+                        cacheFolder.mkdirs();
+                    }
+                    File pdfFile = new File(cacheFolder, filename != null && !filename.isEmpty() ? filename : "Relatorio_Tecnico.pdf");
+                    FileOutputStream fos = new FileOutputStream(pdfFile);
+                    fos.write(pdfBytes);
+                    fos.flush();
+                    fos.close();
+
+                    Uri contentUri = FileProvider.getUriForFile(
+                            MainActivity.this,
+                            getApplicationContext().getPackageName() + ".fileprovider",
+                            pdfFile
+                    );
+
+                    Intent sendIntent = new Intent(Intent.ACTION_SEND);
+                    sendIntent.setType("application/pdf");
+                    if (recipient != null && !recipient.isEmpty()) {
+                        String[] recipients = recipient.split("[,;]");
+                        for (int i = 0; i < recipients.length; i++) {
+                            recipients[i] = recipients[i].trim();
+                        }
+                        sendIntent.putExtra(Intent.EXTRA_EMAIL, recipients);
+                    }
+                    sendIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
+                    sendIntent.putExtra(Intent.EXTRA_TEXT, body);
+                    sendIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    sendIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    // Tenta abrir diretamente com o Gmail oficial
+                    Intent gmailIntent = new Intent(sendIntent);
+                    gmailIntent.setPackage("com.google.android.gm");
+
+                    // Concede permissão temporária de leitura para o pacote do Gmail
+                    grantUriPermission("com.google.android.gm", contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    try {
+                        startActivity(gmailIntent);
+                    } catch (Exception ex) {
+                        // Se o pacote específico falhar, abre seletor com permissão concedida
+                        startActivity(Intent.createChooser(sendIntent, "Enviar Relatório via Gmail"));
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Toast.makeText(MainActivity.this, "Erro ao preparar anexo no Gmail: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    // Fallback para envio simples
+                    openGmail(recipient, subject, body);
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void openGmail(final String recipient, final String subject, final String body) {
             runOnUiThread(() -> {
                 try {
@@ -265,7 +327,38 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == FILE_CHOOSER_RESULT_CODE) {
             if (uploadMessage == null) return;
-            uploadMessage.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+
+            Uri[] results = null;
+            if (resultCode == RESULT_OK) {
+                if (data != null) {
+                    // 1. Tenta extrair múltiplos arquivos selecionados via ClipData (galeria de fotos)
+                    ClipData clipData = data.getClipData();
+                    if (clipData != null && clipData.getItemCount() > 0) {
+                        ArrayList<Uri> urisList = new ArrayList<>();
+                        for (int i = 0; i < clipData.getItemCount(); i++) {
+                            Uri uri = clipData.getItemAt(i).getUri();
+                            if (uri != null) {
+                                urisList.add(uri);
+                            }
+                        }
+                        if (!urisList.isEmpty()) {
+                            results = urisList.toArray(new Uri[0]);
+                        }
+                    }
+
+                    // 2. Se for seleção de arquivo único com dataUri
+                    if (results == null && data.getData() != null) {
+                        results = new Uri[]{data.getData()};
+                    }
+                }
+
+                // 3. Se o data for nulo ou vazio, utiliza método padrão do FileChooserParams
+                if (results == null) {
+                    results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                }
+            }
+
+            uploadMessage.onReceiveValue(results);
             uploadMessage = null;
         }
     }

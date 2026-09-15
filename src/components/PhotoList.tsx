@@ -75,15 +75,37 @@ export const PhotoList: React.FC<PhotoListProps> = ({
       const file = files[i];
       try {
         const dataUrl = await readFileAsDataURL(file);
-        newRecords.push({
-          id: `p_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
-          dataUrl,
-          caption: '',
-          tag: 'Inspeção',
-          timestamp: timeStr,
-        });
+        if (dataUrl && dataUrl.startsWith('data:image/')) {
+          newRecords.push({
+            id: `p_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+            dataUrl,
+            caption: '',
+            tag: 'Inspeção',
+            timestamp: timeStr,
+          });
+        }
       } catch (err) {
         console.error('Error reading photo from gallery:', err);
+        // Direct FileReader fallback if custom reader failed
+        try {
+          const directReader = new FileReader();
+          const fallbackDataUrl = await new Promise<string>((resolve, reject) => {
+            directReader.onload = () => resolve(directReader.result as string);
+            directReader.onerror = reject;
+            directReader.readAsDataURL(file);
+          });
+          if (fallbackDataUrl) {
+            newRecords.push({
+              id: `p_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+              dataUrl: fallbackDataUrl,
+              caption: '',
+              tag: 'Inspeção',
+              timestamp: timeStr,
+            });
+          }
+        } catch (fallbackErr) {
+          console.error('Fallback read also failed:', fallbackErr);
+        }
       }
     }
 
@@ -106,6 +128,10 @@ export const PhotoList: React.FC<PhotoListProps> = ({
         accept="image/*"
         multiple
         className="hidden"
+        onClick={(e) => {
+          // Reset value on click so selecting the same photo or reopening works every time
+          (e.target as HTMLInputElement).value = '';
+        }}
         onChange={handlePhotoGalleryFiles}
       />
 

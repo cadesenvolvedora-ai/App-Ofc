@@ -116,14 +116,78 @@ export function generateTechnicalPlaceholder(title: string, colorScheme: 'orange
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
-// Read File as High Quality Data URL
+// Read and optimize photo from Smartphone/Tablet gallery with orientation support
 export function readFileAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Check if valid image
+    if (!file.type.startsWith('image/') && !file.name.match(/\.(jpg|jpeg|png|webp|heic|bmp)$/i)) {
+      reject(new Error('Arquivo selecionado não é uma imagem válida'));
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = (err) => reject(err);
     reader.onload = () => {
-      resolve(reader.result as string);
+      const rawDataUrl = reader.result as string;
+      if (!rawDataUrl) {
+        reject(new Error('Falha ao ler arquivo'));
+        return;
+      }
+
+      // Check size: if below 1.5MB, return directly without heavy re-encoding
+      if (file.size < 1.5 * 1024 * 1024) {
+        resolve(rawDataUrl);
+        return;
+      }
+
+      // If larger image from high-end smartphone camera (e.g. 12MP-50MP = 5MB-15MB),
+      // scale down gracefully to 1920x1920 max while maintaining sharp technical clarity.
+      // This prevents browser/WebView out-of-memory crashes and makes PDF generation instant.
+      const img = new Image();
+      img.onerror = () => {
+        // Fallback to raw data url if canvas fails
+        resolve(rawDataUrl);
+      };
+      img.onload = () => {
+        try {
+          const maxDimension = 1920;
+          let { width, height } = img;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            resolve(rawDataUrl);
+            return;
+          }
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Return high quality JPEG
+          const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          resolve(optimizedDataUrl);
+        } catch (e) {
+          console.warn('Canvas optimization error, falling back to original:', e);
+          resolve(rawDataUrl);
+        }
+      };
+      img.src = rawDataUrl;
     };
-    reader.onerror = (error) => reject(error);
     reader.readAsDataURL(file);
   });
 }
+

@@ -176,12 +176,30 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
     // 1. Save/download the PDF to device storage
     handleDownloadPDF();
 
-    // 2. If running inside Android APK native interface, open native Gmail app directly
-    if (typeof window !== 'undefined' && (window as any).Android?.openGmail) {
-      (window as any).Android.openGmail(recipientsString, emailSubject, emailBody);
-      setEmailSentNotice(true);
-      setTimeout(() => setEmailSentNotice(false), 4000);
-      return;
+    // 2. If running inside Android APK native interface, open native Gmail app directly with ATTACHED PDF!
+    if (typeof window !== 'undefined' && (window as any).Android) {
+      try {
+        const base64 = await blobToBase64(pdfResult.blob);
+        if ((window as any).Android.sendEmailWithPdf) {
+          (window as any).Android.sendEmailWithPdf(
+            recipientsString,
+            emailSubject,
+            emailBody,
+            base64,
+            pdfResult.filename
+          );
+          setEmailSentNotice(true);
+          setTimeout(() => setEmailSentNotice(false), 4000);
+          return;
+        } else if ((window as any).Android.openGmail) {
+          (window as any).Android.openGmail(recipientsString, emailSubject, emailBody);
+          setEmailSentNotice(true);
+          setTimeout(() => setEmailSentNotice(false), 4000);
+          return;
+        }
+      } catch (err) {
+        console.warn('Bridge email error, falling back:', err);
+      }
     }
 
     // 3. Try Web Share API with attached PDF file on Android (Native Share -> Gmail)

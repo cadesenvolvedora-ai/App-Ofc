@@ -178,43 +178,93 @@ export default function App() {
 
   // Photo handlers
   const handleAddPhoto = (newPhoto: PhotoRecord) => {
-    handleUpdateActiveReport({
-      photos: [...activeReport.photos, newPhoto],
-    });
+    setReports((prev) =>
+      prev.map((r) => {
+        if (r.id === activeReportId) {
+          return {
+            ...r,
+            photos: [...r.photos, newPhoto],
+            updatedAt: Date.now(),
+          };
+        }
+        return r;
+      })
+    );
     showToast('Foto adicionada com sucesso ao relatório!', 'success');
   };
 
   const handleAddMultiplePhotos = (newPhotos: PhotoRecord[]) => {
-    handleUpdateActiveReport({
-      photos: [...activeReport.photos, ...newPhotos],
-    });
+    setReports((prev) =>
+      prev.map((r) => {
+        if (r.id === activeReportId) {
+          return {
+            ...r,
+            photos: [...r.photos, ...newPhotos],
+            updatedAt: Date.now(),
+          };
+        }
+        return r;
+      })
+    );
     showToast(`${newPhotos.length} fotos adicionadas com sucesso!`, 'success');
   };
 
   const handleUpdatePhoto = (photoId: string, updatedFields: Partial<PhotoRecord>) => {
-    const updatedPhotos = activeReport.photos.map((p) => {
-      if (p.id === photoId) {
-        return { ...p, ...updatedFields };
-      }
-      return p;
-    });
-    handleUpdateActiveReport({ photos: updatedPhotos });
+    setReports((prev) =>
+      prev.map((r) => {
+        if (r.id === activeReportId) {
+          const updatedPhotos = r.photos.map((p) => {
+            if (p.id === photoId) {
+              return { ...p, ...updatedFields };
+            }
+            return p;
+          });
+          return {
+            ...r,
+            photos: updatedPhotos,
+            updatedAt: Date.now(),
+          };
+        }
+        return r;
+      })
+    );
   };
 
   const handleDeletePhoto = (photoId: string) => {
-    const updatedPhotos = activeReport.photos.filter((p) => p.id !== photoId);
-    handleUpdateActiveReport({ photos: updatedPhotos });
+    setReports((prev) =>
+      prev.map((r) => {
+        if (r.id === activeReportId) {
+          return {
+            ...r,
+            photos: r.photos.filter((p) => p.id !== photoId),
+            updatedAt: Date.now(),
+          };
+        }
+        return r;
+      })
+    );
     showToast('Foto removida do relatório.', 'info');
   };
 
   const handleReorderPhotos = (startIndex: number, endIndex: number) => {
-    if (startIndex < 0 || endIndex < 0 || startIndex >= activeReport.photos.length || endIndex >= activeReport.photos.length) {
-      return;
-    }
-    const result: PhotoRecord[] = [...activeReport.photos];
-    const [removed] = result.splice(startIndex, 1);
-    result.splice(endIndex, 0, removed);
-    handleUpdateActiveReport({ photos: result });
+    setReports((prev) =>
+      prev.map((r) => {
+        if (r.id === activeReportId) {
+          if (startIndex < 0 || endIndex < 0 || startIndex >= r.photos.length || endIndex >= r.photos.length) {
+            return r;
+          }
+          const result: PhotoRecord[] = [...r.photos];
+          const [removed] = result.splice(startIndex, 1);
+          result.splice(endIndex, 0, removed);
+          return {
+            ...r,
+            photos: result,
+            updatedAt: Date.now(),
+          };
+        }
+        return r;
+      })
+    );
   };
 
   // Attempt to open Export Modal with Validation Check
