@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@layer base {
+  html,
+  body {
+    background-color: #000000;
+    color: #ffffff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Automatic line-breaking so text never escapes boxes */
+  textarea,
+  input,
+  p,
+  span,
+  div,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  textarea {
+    white-space: pre-wrap;
+  }
+}

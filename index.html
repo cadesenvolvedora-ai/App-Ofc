@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Relatório Técnico de Manutenção</title>
+    <meta name="description" content="Aplicativo para geração de relatórios técnicos de manutenção de equipamentos com fotos em alta qualidade, comentários detalhados, gestão de múltiplas abas e envio de PDF profissional via Gmail." />
+    <meta property="og:title" content="Relatório Técnico de Manutenção" />
+    <meta property="og:description" content="Aplicativo para geração de relatórios técnicos de manutenção de equipamentos com fotos em alta qualidade, comentários detalhados, gestão de múltiplas abas e envio de PDF profissional via Gmail." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="RelatManut" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="alternate" type="application/manifest+json" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').catch(function(err) {
+            console.warn('SW registration failed:', err);
+          });
+        });
+      }
+    </script>
+  </head>
+  <body class="bg-black text-white antialiased selection:bg-amber-500 selection:text-black">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

@@ -1,0 +1,6 @@
+{
+  "name": "Relatório Técnico de Manutenção",
+  "description": "Aplicativo para geração de relatórios técnicos de manutenção de equipamentos com fotos em alta qualidade, comentários detalhados, gestão de múltiplas abas e envio de PDF profissional via Gmail.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

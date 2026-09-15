@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#blueGrad)" />
+  <!-- Clipboard Body -->
+  <rect x="116" y="110" width="280" height="340" rx="24" fill="#ffffff" />
+  <!-- Clipboard Clip Top -->
+  <path d="M196 90 C196 74 210 60 226 60 L286 60 C302 60 316 74 316 90 L316 110 L196 110 Z" fill="#0284c7" />
+  <circle cx="256" cy="85" r="10" fill="#ffffff" />
+  <!-- Checklist / Inspection Lines -->
+  <rect x="160" y="170" width="130" height="14" rx="7" fill="#0284c7" />
+  <rect x="160" y="206" width="190" height="10" rx="5" fill="#94a3b8" />
+  <rect x="160" y="232" width="160" height="10" rx="5" fill="#94a3b8" />
+  <!-- Gear & Camera Badge -->
+  <circle cx="330" cy="350" r="70" fill="url(#accentGrad)" />
+  <!-- Camera symbol inside badge -->
+  <path d="M305 335 L315 322 L345 322 L355 335 L370 335 C375 335 380 340 380 345 L380 375 C380 380 375 385 370 385 L290 385 C285 385 280 380 280 375 L280 345 C280 340 285 335 290 335 Z" fill="#ffffff" />
+  <circle cx="330" cy="360" r="15" fill="#0284c7" />
+  <circle cx="330" cy="360" r="8" fill="#ffffff" />
+</svg>
