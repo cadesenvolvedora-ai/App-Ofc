@@ -32,7 +32,8 @@ export default function App() {
       console.error('Error loading settings from localStorage', e);
     }
     return {
-      preconfiguredEmail: 'c.a.castro895@gmail.com',
+      preconfiguredEmail: 'paulo.sousa@kinross.com',
+      recipientEmails: ['paulo.sousa@kinross.com'],
       technicianDefaultName: 'Carlos A. Castro',
       companyName: 'Engenharia de Manutenção Industrial',
       photosPerPage: 1,

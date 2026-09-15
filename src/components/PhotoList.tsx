@@ -50,8 +50,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
   onReorderPhotos,
   onOpenLiveCamera,
 }) => {
-  const galleryInputRef = useRef<HTMLInputElement | null>(null);
-  const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const photoGalleryInputRef = useRef<HTMLInputElement | null>(null);
 
   const [selectedPhotoForZoom, setSelectedPhotoForZoom] = useState<{
     photo: PhotoRecord;
@@ -61,8 +60,8 @@ export const PhotoList: React.FC<PhotoListProps> = ({
   const [photoToDelete, setPhotoToDelete] = useState<PhotoRecord | null>(null);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
 
-  // Handle Gallery Files (Supports multiple files at once!)
-  const handleGalleryFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Gallery / System Photo Picker Files (Supports single or multiple images!)
+  const handlePhotoGalleryFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -84,62 +83,30 @@ export const PhotoList: React.FC<PhotoListProps> = ({
           timestamp: timeStr,
         });
       } catch (err) {
-        console.error('Error reading file:', err);
+        console.error('Error reading photo from gallery:', err);
       }
     }
 
-    if (newRecords.length > 0) {
+    if (newRecords.length === 1) {
+      onAddPhoto(newRecords[0]);
+    } else if (newRecords.length > 1) {
       onAddMultiplePhotos(newRecords);
     }
+
     setIsProcessingFiles(false);
-    // reset input
-    if (galleryInputRef.current) galleryInputRef.current.value = '';
-  };
-
-  // Handle Native Device Camera File Capture (Highest phone resolution)
-  const handleNativeCameraFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsProcessingFiles(true);
-    try {
-      const file = files[0];
-      const dataUrl = await readFileAsDataURL(file);
-      const now = new Date();
-      const timeStr = `${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-
-      onAddPhoto({
-        id: `p_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        dataUrl,
-        caption: '',
-        tag: 'Inspeção',
-        timestamp: timeStr,
-      });
-    } catch (err) {
-      console.error('Error reading native camera photo:', err);
-    }
-    setIsProcessingFiles(false);
-    if (nativeCameraInputRef.current) nativeCameraInputRef.current.value = '';
+    if (photoGalleryInputRef.current) photoGalleryInputRef.current.value = '';
   };
 
   return (
     <div className="space-y-4">
-      {/* Hidden File Inputs */}
+      {/* Hidden File Input for Gallery / System Photo Picker */}
       <input
-        ref={galleryInputRef}
+        ref={photoGalleryInputRef}
         type="file"
         accept="image/*"
         multiple
         className="hidden"
-        onChange={handleGalleryFiles}
-      />
-      <input
-        ref={nativeCameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleNativeCameraFile}
+        onChange={handlePhotoGalleryFiles}
       />
 
       {/* Action Header Card */}
@@ -154,7 +121,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
             </span>
           </div>
           <p className="text-xs text-zinc-400 mt-1">
-            Capture direto pela câmera ou selecione da galeria. As imagens são preservadas em máxima resolução.
+            Tire fotos ao vivo com a câmera do app ou selecione diretamente da galeria do aparelho.
           </p>
         </div>
 
@@ -162,6 +129,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           {/* In-App Live Camera Button */}
           <button
+            type="button"
             id="btn-open-live-camera"
             onClick={onOpenLiveCamera}
             className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 active:scale-95 text-white text-xs sm:text-sm font-bold shadow-md shadow-amber-600/20 transition"
@@ -171,26 +139,16 @@ export const PhotoList: React.FC<PhotoListProps> = ({
             <span>Tirar Foto (App)</span>
           </button>
 
-          {/* Native Device Camera (Fallback / Native Full Res) */}
+          {/* Galeria de Fotos (Renomeado da Câmera Nativa, botão funcional no Tablet) */}
           <button
-            id="btn-native-camera"
-            onClick={() => nativeCameraInputRef.current?.click()}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-zinc-200 text-xs sm:text-sm font-semibold border border-neutral-800 transition"
-            title="Tirar foto usando o aplicativo nativo de câmera do Android"
+            type="button"
+            id="btn-photo-gallery"
+            onClick={() => photoGalleryInputRef.current?.click()}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-amber-300 text-xs sm:text-sm font-bold border border-amber-500/30 shadow-md transition"
+            title="Selecionar fotos da galeria do tablet ou celular"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Câmera Nativa</span>
-          </button>
-
-          {/* Gallery Button */}
-          <button
-            id="btn-add-from-gallery"
-            onClick={() => galleryInputRef.current?.click()}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-amber-300 text-xs sm:text-sm font-semibold border border-neutral-800 transition"
-            title="Selecionar uma ou várias fotos da galeria do aparelho"
-          >
-            <ImageIcon className="w-4 h-4" />
-            <span>Da Galeria</span>
+            <ImageIcon className="w-4 h-4 text-amber-400" />
+            <span>Galeria de Fotos</span>
           </button>
         </div>
       </div>
@@ -217,6 +175,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
+              type="button"
               onClick={onOpenLiveCamera}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white text-xs sm:text-sm font-bold shadow-md transition"
             >
@@ -224,11 +183,12 @@ export const PhotoList: React.FC<PhotoListProps> = ({
               Tirar Foto Agora
             </button>
             <button
-              onClick={() => galleryInputRef.current?.click()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-zinc-200 text-xs sm:text-sm font-semibold border border-neutral-800 transition"
+              type="button"
+              onClick={() => photoGalleryInputRef.current?.click()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 text-xs sm:text-sm font-bold border border-amber-500/30 transition shadow"
             >
-              <ImageIcon className="w-4 h-4" />
-              Escolher da Galeria
+              <ImageIcon className="w-4 h-4 text-amber-400" />
+              Galeria de Fotos
             </button>
           </div>
         </div>

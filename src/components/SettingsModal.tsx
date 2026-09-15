@@ -27,7 +27,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         .filter(Boolean);
       if (parsed.length > 0) return parsed;
     }
-    return ['c.a.castro895@gmail.com'];
+    return ['paulo.sousa@kinross.com'];
   });
 
   const [newEmailInput, setNewEmailInput] = useState('');
