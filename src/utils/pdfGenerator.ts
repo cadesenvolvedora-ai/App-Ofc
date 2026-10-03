@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { MaintenanceReport, AppSettings } from '../types';
+import { MaintenanceReport, AppSettings, PartsOrderSheet } from '../types';
 import { 
   hasAdjustmentSheetData, 
   hasProcedureSheetData, 
@@ -397,6 +397,349 @@ export async function generateMaintenancePDF(
   }
 
   const cleanFilename = `Relatorio_Tecnico_OS_${(report.os || 'GERAL').replace(/[^a-zA-Z0-9]/g, '_')}_TAG_${(report.tag || 'EQUIP').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  const blob = pdf.output('blob');
+  const blobUrl = URL.createObjectURL(blob);
+
+  return {
+    blob,
+    blobUrl,
+    filename: cleanFilename,
+  };
+}
+
+/**
+ * Converts a Blob to a Base64 string for Android native bridge transmission.
+ */
+export const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(',')[1] || '';
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+/**
+ * Generates an institutional, standalone PDF for the Parts Order Sheet (LISTA P/ PEDIDO DE PEÇAS)
+ * to be attached to Gmail on Android devices and shared with warehouse / purchasing teams.
+ */
+export async function generatePartsOrderPDF(
+  sheet: PartsOrderSheet,
+  reportInfo: {
+    tag: string;
+    os: string;
+    equipment?: string;
+    technician?: string;
+  },
+  settings?: Partial<AppSettings>
+): Promise<PDFGenerationResult> {
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Kinross Corporate Palette
+  const darkNavy = [15, 23, 42]; // #0f172a
+  const slateGray = [71, 85, 105]; // #475569
+  const lightBg = [248, 250, 252]; // #f8fafc
+  const borderGray = [203, 213, 225]; // #cbd5e1
+  const darkGold = [184, 134, 11]; // #b8860b Kinross Dark Gold
+  const kinrossGold = [202, 138, 4]; // #ca8a04
+  const lightGoldBg = [254, 252, 232]; // #fefce8
+
+  const tagVal = sheet.tag || reportInfo.tag || 'N/A';
+  const osVal = sheet.os || reportInfo.os || 'N/A';
+  const equipVal = sheet.equipamento || reportInfo.equipment || 'N/A';
+  const solicitanteVal = sheet.solicitante || reportInfo.technician || 'Carlos A. Castro';
+  const dataVal = sheet.data || new Date().toISOString().split('T')[0];
+  const areaVal = sheet.area || 'Oficina Central de Manutenção';
+
+  const drawRunningHeader = (pageNum: number) => {
+    if (pageNum === 1) return;
+    pdf.setFillColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+    pdf.rect(margin, 8, contentWidth, 8, 'F');
+    pdf.setFillColor(darkGold[0], darkGold[1], darkGold[2]);
+    pdf.rect(margin, 16, contentWidth, 0.8, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('LISTA P/ PEDIDO DE PEÇAS • OFICINA CENTRAL', margin + 4, 13.5);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`TAG: ${tagVal}  |  OS: ${osVal}`, pageWidth - margin - 4, 13.5, { align: 'right' });
+  };
+
+  const drawFooter = (pageNum: number) => {
+    const y = pageHeight - 9;
+    pdf.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, y - 2, pageWidth - margin, y - 2);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
+    const now = new Date().toLocaleString('pt-BR');
+    pdf.text(`${settings?.companyName || 'Kinross Brasil Mineração • Engenharia de Manutenção'} • Emitido em: ${now}`, margin, y + 2);
+    pdf.text(`Página ${pageNum}`, pageWidth - margin, y + 2, { align: 'right' });
+  };
+
+  // ---------------- PAGE 1 ----------------
+  let currentY = margin;
+
+  // Header Banner
+  pdf.setFillColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+  pdf.rect(margin, currentY, contentWidth, 24, 'F');
+
+  pdf.setFillColor(darkGold[0], darkGold[1], darkGold[2]);
+  pdf.rect(margin, currentY + 24, contentWidth, 2, 'F');
+
+  // Title inside banner
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(13);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text('LISTA P/ PEDIDO DE PEÇAS', margin + 6, currentY + 10);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(254, 243, 199);
+  pdf.text('OFICINA CENTRAL DE MANUTENÇÃO INDUSTRIAL • REQUISIÇÃO OFICIAL', margin + 6, currentY + 17);
+
+  // Status Badge
+  pdf.setFillColor(darkGold[0], darkGold[1], darkGold[2]);
+  pdf.roundedRect(pageWidth - margin - 42, currentY + 6, 36, 11, 2, 2, 'F');
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(8);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text('REQUISIÇÃO', pageWidth - margin - 24, currentY + 13, { align: 'center' });
+
+  currentY += 31;
+
+  // Metadata Grid: 2 rows of 3 columns
+  const metaRowHeight = 7.5;
+  const colWidth = contentWidth / 3;
+
+  // Row 1: DATA | TAG | EQUIPAMENTO
+  const metaRow1 = [
+    { label: 'DATA', value: dataVal },
+    { label: 'TAG', value: tagVal },
+    { label: 'EQUIPAMENTO', value: equipVal },
+  ];
+
+  pdf.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+  pdf.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  pdf.setLineWidth(0.3);
+  pdf.rect(margin, currentY, contentWidth, metaRowHeight, 'FD');
+
+  metaRow1.forEach((item, idx) => {
+    const colX = margin + idx * colWidth;
+    if (idx > 0) pdf.line(colX, currentY, colX, currentY + metaRowHeight);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
+    pdf.text(`${item.label}:`, colX + 3, currentY + 3.2);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+    pdf.text(item.value || '---', colX + 24, currentY + 5.5);
+  });
+  currentY += metaRowHeight;
+
+  // Row 2: POR (Solicitante) | OS | ÁREA
+  const metaRow2 = [
+    { label: 'POR', value: solicitanteVal },
+    { label: 'OS', value: osVal },
+    { label: 'ÁREA', value: areaVal },
+  ];
+
+  pdf.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+  pdf.rect(margin, currentY, contentWidth, metaRowHeight, 'FD');
+
+  metaRow2.forEach((item, idx) => {
+    const colX = margin + idx * colWidth;
+    if (idx > 0) pdf.line(colX, currentY, colX, currentY + metaRowHeight);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
+    pdf.text(`${item.label}:`, colX + 3, currentY + 3.2);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+    pdf.text(item.value || '---', colX + 24, currentY + 5.5);
+  });
+  currentY += metaRowHeight + 4;
+
+  // Table Columns Setup
+  const colW_item = 14;
+  const colW_codigo = 36;
+  const colW_qtd = 26;
+  const colW_desc = contentWidth - (colW_item + colW_codigo + colW_qtd);
+
+  const drawTableHeader = (y: number) => {
+    pdf.setFillColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+    pdf.rect(margin, y, contentWidth, 7, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.setTextColor(255, 255, 255);
+
+    let curX = margin;
+    pdf.text('Nº', curX + colW_item / 2, y + 4.8, { align: 'center' });
+    curX += colW_item;
+    pdf.text('CÓDIGO (SAP / INTERNO)', curX + colW_codigo / 2, y + 4.8, { align: 'center' });
+    curX += colW_codigo;
+    pdf.text('QUANTIDADE', curX + colW_qtd / 2, y + 4.8, { align: 'center' });
+    curX += colW_qtd;
+    pdf.text('DESCRIÇÃO DO COMPONENTE / PART NUMBER', curX + 4, y + 4.8);
+    return y + 7;
+  };
+
+  currentY = drawTableHeader(currentY);
+
+  // Filter items or combine with padding up to 14 rows
+  const validItems = sheet.items.filter(
+    (it) => it.codigo.trim() || it.quantidade.trim() || it.descricaoPartNumber.trim()
+  );
+
+  const rows: Array<{ id: string; codigo: string; quantidade: string; descricaoPartNumber: string }> = [...sheet.items];
+  while (rows.length < 14) {
+    rows.push({
+      id: `pad_${rows.length}`,
+      codigo: '',
+      quantidade: '',
+      descricaoPartNumber: '',
+    });
+  }
+
+  let pageNum = 1;
+  const itemRowHeight = 9.2;
+
+  rows.forEach((item, index) => {
+    // Pagination safety
+    if (currentY + itemRowHeight > pageHeight - 38) {
+      drawFooter(pageNum);
+      pdf.addPage();
+      pageNum = pdf.getNumberOfPages();
+      drawRunningHeader(pageNum);
+      currentY = 22;
+      currentY = drawTableHeader(currentY);
+    }
+
+    const isZebra = index % 2 === 1;
+    if (isZebra) {
+      pdf.setFillColor(248, 250, 252);
+    } else {
+      pdf.setFillColor(255, 255, 255);
+    }
+    pdf.rect(margin, currentY, contentWidth, itemRowHeight, 'F');
+
+    pdf.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+    pdf.setLineWidth(0.2);
+    pdf.rect(margin, currentY, contentWidth, itemRowHeight, 'D');
+
+    // Column separators
+    let sepX = margin + colW_item;
+    pdf.line(sepX, currentY, sepX, currentY + itemRowHeight);
+    sepX += colW_codigo;
+    pdf.line(sepX, currentY, sepX, currentY + itemRowHeight);
+    sepX += colW_qtd;
+    pdf.line(sepX, currentY, sepX, currentY + itemRowHeight);
+
+    // Number
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
+    pdf.text(String(index + 1).padStart(2, '0'), margin + colW_item / 2, currentY + 5.5, { align: 'center' });
+
+    // Código
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+    if (item.codigo) {
+      pdf.text(item.codigo, margin + colW_item + colW_codigo / 2, currentY + 5.5, { align: 'center' });
+    }
+
+    // Quantidade
+    if (item.quantidade) {
+      pdf.text(item.quantidade, margin + colW_item + colW_codigo + colW_qtd / 2, currentY + 5.5, { align: 'center' });
+    }
+
+    // Descrição / Part Number
+    if (item.descricaoPartNumber) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+      const splitDesc = pdf.splitTextToSize(item.descricaoPartNumber, colW_desc - 6);
+      pdf.text(splitDesc.slice(0, 2), margin + colW_item + colW_codigo + colW_qtd + 3, currentY + 4);
+    }
+
+    currentY += itemRowHeight;
+  });
+
+  // Summary and Sign-off Box
+  if (currentY + 32 > pageHeight - 16) {
+    drawFooter(pageNum);
+    pdf.addPage();
+    pageNum = pdf.getNumberOfPages();
+    drawRunningHeader(pageNum);
+    currentY = 22;
+  } else {
+    currentY += 3;
+  }
+
+  // Verification Box
+  pdf.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+  pdf.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(margin, currentY, contentWidth, 24, 1.5, 1.5, 'FD');
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(darkGold[0], darkGold[1], darkGold[2]);
+  pdf.text('DADOS DA REQUISIÇÃO & ENCAMINHAMENTO TÉCNICO', margin + 4, currentY + 5.5);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7);
+  pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+  pdf.text(`Total de Itens Requisitados: ${validItems.length} item(ns) cadastrados`, margin + 4, currentY + 11.5);
+  
+  const recipientsText = (sheet.recipientEmails && sheet.recipientEmails.length > 0)
+    ? sheet.recipientEmails.join(', ')
+    : 'paulo.sousa@kinross.com';
+  const wrappedRecipients = pdf.splitTextToSize(`Destinatários do E-mail: ${recipientsText}`, contentWidth - 8);
+  pdf.text(wrappedRecipients, margin + 4, currentY + 16.5);
+
+  pdf.setFont('helvetica', 'italic');
+  pdf.setFontSize(6.5);
+  pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
+  pdf.text(`Material solicitado por ${solicitanteVal} para intervenção na TAG ${tagVal} (OS ${osVal}). Documento gerado e validado digitalmente.`, margin + 4, currentY + 21.5);
+
+  drawFooter(pageNum);
+
+  // Overwrite total page numbers
+  const totalPages = pdf.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    pdf.setPage(p);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
+    const footerY = pageHeight - 7;
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(pageWidth - margin - 35, footerY - 4, 35, 6, 'F');
+    pdf.text(`Página ${p} de ${totalPages}`, pageWidth - margin, footerY, { align: 'right' });
+  }
+
+  const cleanFilename = `Pedido_Pecas_OS_${(osVal || 'GERAL').replace(/[^a-zA-Z0-9]/g, '_')}_TAG_${(tagVal || 'EQUIP').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   const blob = pdf.output('blob');
   const blobUrl = URL.createObjectURL(blob);
 

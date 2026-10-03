@@ -363,6 +363,7 @@ export function createDefaultPartsOrderSheet(tag: string = '', os: string = '', 
     os: os || '',
     area: '',
     items: initialItems,
+    recipientEmails: ['paulo.sousa@kinross.com'],
   };
 }
 

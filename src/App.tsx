@@ -367,6 +367,7 @@ export default function App() {
           onChange={handleUpdateActiveReport}
           showValidationErrors={showValidationErrors}
           preconfiguredEmail={settings.preconfiguredEmail}
+          settings={settings}
         />
 
         {/* Section 2: Photographic Records (Gallery & Camera with captions) */}

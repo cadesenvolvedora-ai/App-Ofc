@@ -16,7 +16,7 @@ import {
   ClipboardList,
   Zap
 } from 'lucide-react';
-import { MaintenanceReport } from '../types';
+import { MaintenanceReport, AppSettings } from '../types';
 import { ExcelAdjustmentModal } from './ExcelAdjustmentModal';
 import { ExcelProcedureModal } from './ExcelProcedureModal';
 import { PartsOrderModal } from './PartsOrderModal';
@@ -39,6 +39,7 @@ interface ReportHeaderFormProps {
   onChange: (updated: Partial<MaintenanceReport>) => void;
   showValidationErrors?: boolean;
   preconfiguredEmail?: string;
+  settings?: AppSettings;
 }
 
 export const ReportHeaderForm: React.FC<ReportHeaderFormProps> = ({
@@ -46,6 +47,7 @@ export const ReportHeaderForm: React.FC<ReportHeaderFormProps> = ({
   onChange,
   showValidationErrors = false,
   preconfiguredEmail,
+  settings,
 }) => {
   const [activeSheetModal, setActiveSheetModal] = useState<
     'ADJUSTMENT' | 'REDUTORES' | 'BOMBAS' | 'MANCAIS' | 'PARTS' | 'MOTOR' | null
@@ -555,6 +557,7 @@ export const ReportHeaderForm: React.FC<ReportHeaderFormProps> = ({
           reportEquipment={report.title || 'N/A'}
           reportTechnician={report.technician || 'N/A'}
           fixedEmail="paulo.sousa@kinross.com"
+          appSettings={settings}
           onSave={(updated) => onChange({ partsOrderSheet: updated })}
         />
       )}

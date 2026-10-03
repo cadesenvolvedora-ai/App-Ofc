@@ -106,6 +106,7 @@ export interface PartsOrderSheet {
   os: string;
   area: string;
   items: PartsOrderItem[];
+  recipientEmails?: string[];
 }
 
 // Manutenção de Motores Elétricos (Testes Iniciais, Elétricos & Folgas Mecânicas)

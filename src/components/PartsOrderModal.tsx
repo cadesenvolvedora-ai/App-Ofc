@@ -3,19 +3,22 @@ import {
   X, 
   Plus, 
   Trash2, 
-  FileSpreadsheet, 
   CheckCircle2, 
   RotateCcw, 
   ClipboardList, 
-  Hash, 
   Box, 
   Layers,
   Mail,
   Copy,
   Check,
-  Send
+  Send,
+  Loader2,
+  AtSign,
+  FileText,
+  AlertCircle
 } from 'lucide-react';
-import { PartsOrderSheet, PartsOrderItem } from '../types';
+import { PartsOrderSheet, PartsOrderItem, AppSettings } from '../types';
+import { generatePartsOrderPDF, blobToBase64 } from '../utils/pdfGenerator';
 
 interface PartsOrderModalProps {
   isOpen: boolean;
@@ -27,6 +30,7 @@ interface PartsOrderModalProps {
   reportEquipment?: string;
   reportTechnician?: string;
   fixedEmail?: string;
+  appSettings?: AppSettings;
 }
 
 export const PartsOrderModal: React.FC<PartsOrderModalProps> = ({
@@ -39,19 +43,34 @@ export const PartsOrderModal: React.FC<PartsOrderModalProps> = ({
   reportEquipment = '',
   reportTechnician = '',
   fixedEmail = 'paulo.sousa@kinross.com',
+  appSettings,
 }) => {
   const [formData, setFormData] = useState<PartsOrderSheet>(() => {
+    const initialRecipients = (sheet.recipientEmails && sheet.recipientEmails.length > 0)
+      ? sheet.recipientEmails
+      : (appSettings?.recipientEmails && appSettings.recipientEmails.length > 0)
+        ? appSettings.recipientEmails
+        : [fixedEmail || 'paulo.sousa@kinross.com'];
+
     return {
       ...sheet,
       tag: sheet.tag || reportTag || '',
       os: sheet.os || reportOs || '',
       data: sheet.data || new Date().toISOString().split('T')[0],
+      recipientEmails: initialRecipients,
     };
   });
 
   const [emailStatus, setEmailStatus] = useState<'idle' | 'copied' | 'opened'>('idle');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   if (!isOpen) return null;
+
+  const currentRecipients = (formData.recipientEmails && formData.recipientEmails.length > 0)
+    ? formData.recipientEmails
+    : [fixedEmail || 'paulo.sousa@kinross.com'];
 
   const handleUpdateItem = (id: string, field: keyof PartsOrderItem, value: string) => {
     setFormData((prev) => ({
@@ -94,6 +113,39 @@ export const PartsOrderModal: React.FC<PartsOrderModalProps> = ({
     }
   };
 
+  const handleAddRecipientEmail = (emailToAdd?: string) => {
+    const email = (emailToAdd !== undefined ? emailToAdd : newEmailInput).trim().toLowerCase();
+    if (!email) return;
+
+    // Standard email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Digite um e-mail válido (ex: almoxarifado@kinross.com).');
+      return;
+    }
+
+    if (currentRecipients.some((e) => e.toLowerCase() === email)) {
+      setEmailError('Este e-mail já está adicionado na lista.');
+      return;
+    }
+
+    const updated = [...currentRecipients, email];
+    setFormData((prev) => ({
+      ...prev,
+      recipientEmails: updated,
+    }));
+    setNewEmailInput('');
+    setEmailError('');
+  };
+
+  const handleRemoveRecipientEmail = (emailToRemove: string) => {
+    const updated = currentRecipients.filter((e) => e.toLowerCase() !== emailToRemove.toLowerCase());
+    setFormData((prev) => ({
+      ...prev,
+      recipientEmails: updated,
+    }));
+  };
+
   const handleSaveAndClose = () => {
     onSave(formData);
     onClose();
@@ -128,7 +180,7 @@ export const PartsOrderModal: React.FC<PartsOrderModalProps> = ({
 
     return `Prezados,
 
-Segue a Lista para Pedido de Peças / Requisição da Oficina Central de Manutenção:
+Segue a Lista para Pedido de Peças / Requisição Oficial da Oficina Central de Manutenção:
 
 ==========================================
 DADOS DA REQUISIÇÃO DE PEÇAS:
@@ -139,6 +191,7 @@ DADOS DA REQUISIÇÃO DE PEÇAS:
 • Solicitante (POR): ${solicitante}
 • Data da Requisição: ${dataReq}
 • Área / Setor: ${areaReq}
+• Destinatários: ${currentRecipients.join(', ')}
 
 ==========================================
 RELAÇÃO DE PEÇAS SOLICITADAS:
@@ -147,49 +200,132 @@ ${itemsList}
 ==========================================
 Total de itens requisitados: ${validItems.length} item(ns)
 
+* Documento formal em PDF de alta qualidade anexado a este e-mail.
+
 Atenciosamente,
 ${solicitante}
-Oficina Central de Manutenção`;
+Oficina Central de Manutenção - Kinross Brasil Mineração`;
   };
 
+  // Generate Parts Order PDF, save file, and launch Gmail app with attached PDF
   const handleSendEmail = async () => {
-    // Persist current sheet edits first
+    // 1. Persist current sheet edits
     onSave(formData);
 
     const tag = formData.tag || reportTag || 'N/A';
     const os = formData.os || reportOs || 'N/A';
     const equip = formData.equipamento || reportEquipment || 'N/A';
-    const targetEmail = fixedEmail || 'paulo.sousa@kinross.com';
+    const technician = formData.solicitante || reportTechnician || 'Carlos A. Castro';
 
-    const subject = `[Pedido de Peças] TAG: ${tag} • OS: ${os} - ${equip}`;
+    const recipientsString = currentRecipients.join(', ');
+    const subject = `[Pedido de Peças Kinross] TAG: ${tag} • OS: ${os} - ${equip}`;
     const body = constructEmailBody();
 
-    // 1. Try mobile native share if available (opens native Gmail / mail app with pre-filled content)
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: subject,
-          text: body,
-        });
-        setEmailStatus('opened');
-        setTimeout(() => setEmailStatus('idle'), 3000);
-        return;
-      } catch (err) {
-        console.log('Share dismissed or cancelled', err);
+    setIsGeneratingPdf(true);
+
+    try {
+      // 2. Generate the dedicated Parts Order PDF
+      const pdfResult = await generatePartsOrderPDF(
+        formData,
+        {
+          tag,
+          os,
+          equipment: equip,
+          technician,
+        },
+        appSettings
+      );
+
+      const base64 = await blobToBase64(pdfResult.blob);
+
+      // 3. Save/Download PDF locally to ensure device persistence
+      if (typeof window !== 'undefined' && (window as any).Android?.savePdf) {
+        try {
+          (window as any).Android.savePdf(base64, pdfResult.filename);
+        } catch (e) {
+          console.warn('Android savePdf fallback:', e);
+        }
+      } else {
+        try {
+          const a = document.createElement('a');
+          a.href = pdfResult.blobUrl;
+          a.download = pdfResult.filename;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            if (document.body.contains(a)) document.body.removeChild(a);
+          }, 300);
+        } catch (e) {
+          console.warn('Web download fallback:', e);
+        }
       }
-    }
 
-    // 2. Direct Gmail Web Compose link with fixed recipient
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // 4. Android APK Bridge: Opens official Gmail app directly with ATTACHED PDF!
+      if (typeof window !== 'undefined' && (window as any).Android) {
+        try {
+          if ((window as any).Android.sendEmailWithPdf) {
+            (window as any).Android.sendEmailWithPdf(
+              recipientsString,
+              subject,
+              body,
+              base64,
+              pdfResult.filename
+            );
+            setEmailStatus('opened');
+            setTimeout(() => setEmailStatus('idle'), 4000);
+            return;
+          } else if ((window as any).Android.openGmail) {
+            (window as any).Android.openGmail(recipientsString, subject, body);
+            setEmailStatus('opened');
+            setTimeout(() => setEmailStatus('idle'), 4000);
+            return;
+          }
+        } catch (err) {
+          console.warn('Android bridge error, falling back:', err);
+        }
+      }
 
-    const newWindow = window.open(gmailUrl, '_blank');
-    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      // 5. Try Web Share API with attached PDF file on Android (Native Share -> Gmail)
+      if (typeof navigator !== 'undefined' && navigator.canShare) {
+        try {
+          const file = new File([pdfResult.blob], pdfResult.filename, { type: 'application/pdf' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: subject,
+              text: body,
+              files: [file],
+            });
+            setEmailStatus('opened');
+            setTimeout(() => setEmailStatus('idle'), 4000);
+            return;
+          }
+        } catch (err) {
+          console.log('Native share skipped or cancelled', err);
+        }
+      }
+
+      // 6. Direct Gmail Compose & Mailto Fallback
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientsString)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoUrl = `mailto:${encodeURIComponent(recipientsString)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      const newWindow = window.open(gmailUrl, '_blank');
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        window.location.href = mailtoUrl;
+      }
+
+      setEmailStatus('opened');
+      setTimeout(() => setEmailStatus('idle'), 4000);
+    } catch (err) {
+      console.error('Error generating PDF or opening Gmail:', err);
+      // Fallback simple mailto
+      const mailtoUrl = `mailto:${encodeURIComponent(recipientsString)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.location.href = mailtoUrl;
+      setEmailStatus('opened');
+      setTimeout(() => setEmailStatus('idle'), 4000);
+    } finally {
+      setIsGeneratingPdf(false);
     }
-
-    setEmailStatus('opened');
-    setTimeout(() => setEmailStatus('idle'), 3000);
   };
 
   const handleCopyText = () => {
@@ -199,7 +335,7 @@ Oficina Central de Manutenção`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 overflow-y-auto">
       <div className="w-full max-w-5xl bg-neutral-950 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="bg-black px-4 sm:px-6 py-3.5 border-b border-neutral-800 flex items-center justify-between gap-3">
@@ -231,7 +367,7 @@ Oficina Central de Manutenção`;
                 onChange={(e) => setFormData((prev) => ({ ...prev, enabled: e.target.checked }))}
                 className="rounded text-amber-500 focus:ring-amber-500 bg-black border-neutral-700"
               />
-              <span className="text-zinc-300 font-medium">Incluir no PDF</span>
+              <span className="text-zinc-300 font-medium">Incluir no PDF do Relatório</span>
             </label>
 
             <button
@@ -318,6 +454,107 @@ Oficina Central de Manutenção`;
                 />
               </div>
             </div>
+          </div>
+
+          {/* Section: Email Recipients Management for Parts Order */}
+          <div className="bg-black rounded-xl border border-neutral-800 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-amber-400" />
+                <span>DESTINATÁRIOS DE E-MAIL DO PEDIDO DE PEÇAS</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/60 font-semibold">
+                  {currentRecipients.length} destinatário{currentRecipients.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <span className="text-[11px] text-zinc-400">
+                O Gmail abrirá com o PDF oficial anexado para todos os e-mails configurados
+              </span>
+            </div>
+
+            {/* Recipient Chips */}
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {currentRecipients.map((email, idx) => {
+                const isDefault = email.toLowerCase() === (fixedEmail || 'paulo.sousa@kinross.com').toLowerCase();
+                return (
+                  <span
+                    key={`${email}-${idx}`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
+                      isDefault
+                        ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/80 shadow-sm shadow-emerald-950'
+                        : 'bg-neutral-900 text-zinc-200 border-neutral-700 hover:border-zinc-500'
+                    }`}
+                  >
+                    <AtSign className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="font-mono">{email}</span>
+                    {isDefault && (
+                      <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-900/90 text-emerald-300 border border-emerald-700/50">
+                        Principal
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRecipientEmail(email)}
+                      className="p-0.5 rounded hover:bg-neutral-800 text-zinc-400 hover:text-rose-400 transition"
+                      title={`Remover ${email}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                );
+              })}
+
+              {currentRecipients.length === 0 && (
+                <div className="flex items-center gap-2 text-xs text-rose-400 py-1">
+                  <AlertCircle className="w-4 h-4 text-rose-400" />
+                  <span>Nenhum destinatário definido.</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRecipientEmail(fixedEmail || 'paulo.sousa@kinross.com')}
+                    className="text-amber-400 hover:underline font-semibold"
+                  >
+                    Restaurar {fixedEmail || 'paulo.sousa@kinross.com'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Input to add more emails */}
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-1">
+              <div className="relative flex-1">
+                <input
+                  type="email"
+                  value={newEmailInput}
+                  onChange={(e) => {
+                    setNewEmailInput(e.target.value);
+                    if (emailError) setEmailError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddRecipientEmail();
+                    }
+                  }}
+                  placeholder="Adicionar outro e-mail (ex: almoxarifado@kinross.com, supervisor@kinross.com)..."
+                  className="w-full bg-neutral-900 border border-neutral-700 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 outline-none transition"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleAddRecipientEmail()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold text-xs transition shadow-sm flex-shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Adicionar E-mail</span>
+              </button>
+            </div>
+
+            {emailError && (
+              <p className="text-[11px] text-rose-400 font-medium flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                {emailError}
+              </p>
+            )}
           </div>
 
           {/* Items Table */}
@@ -413,15 +650,22 @@ Oficina Central de Manutenção`;
         </div>
 
         {/* Lower Action & Email Dispatch Bar */}
-        <div className="bg-neutral-900/95 border-t border-neutral-800 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
+        <div className="bg-neutral-900/95 border-t border-neutral-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
               <Mail className="w-4 h-4" />
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-zinc-300">
-              <span className="text-[11px] text-zinc-400 font-medium">Destinatário Fixo:</span>
-              <span className="font-mono text-emerald-400 font-bold text-xs bg-emerald-950/70 px-2.5 py-0.5 rounded border border-emerald-800/50">
-                {fixedEmail}
+            <div className="flex flex-col text-zinc-300">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-zinc-400 font-medium">Destinatários ({currentRecipients.length}):</span>
+                <span className="font-mono text-emerald-400 font-bold text-xs">
+                  {currentRecipients.length === 1
+                    ? currentRecipients[0]
+                    : `${currentRecipients[0]} (+${currentRecipients.length - 1} outro${currentRecipients.length > 2 ? 's' : ''})`}
+                </span>
+              </div>
+              <span className="text-[10px] text-zinc-400">
+                Gera o PDF da lista de peças e abre o app do Gmail com o PDF anexado
               </span>
             </div>
           </div>
@@ -431,7 +675,7 @@ Oficina Central de Manutenção`;
               type="button"
               id="btn-copy-parts-text"
               onClick={handleCopyText}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-zinc-300 font-semibold text-xs border border-neutral-700 transition active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-zinc-300 font-semibold text-xs border border-neutral-700 transition active:scale-95"
               title="Copiar texto formatado da requisição para a área de transferência"
             >
               {emailStatus === 'copied' ? (
@@ -447,22 +691,39 @@ Oficina Central de Manutenção`;
               )}
             </button>
 
+            {/* Main Action Button: Opens Gmail with PDF attachment */}
             <button
               type="button"
               id="btn-send-parts-order-email"
+              disabled={isGeneratingPdf}
               onClick={handleSendEmail}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/70 border border-emerald-500/40 transition active:scale-95"
-              title={`Enviar lista de peças via E-mail diretamente para ${fixedEmail}`}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg transition active:scale-95 ${
+                isGeneratingPdf
+                  ? 'bg-neutral-800 text-zinc-400 cursor-not-allowed border border-neutral-700'
+                  : emailStatus === 'opened'
+                  ? 'bg-emerald-600 text-white shadow-emerald-950/80 border border-emerald-400'
+                  : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-950/70 border border-emerald-500/40'
+              }`}
+              title={`Abrir app do Gmail com a lista de peças em PDF anexada para: ${currentRecipients.join(', ')}`}
             >
-              {emailStatus === 'opened' ? (
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                  <span>Gerando PDF & Abrindo Gmail...</span>
+                </>
+              ) : emailStatus === 'opened' ? (
                 <>
                   <Check className="w-4 h-4 text-white animate-bounce" />
-                  <span>E-mail Aberto!</span>
+                  <span>E-mail & PDF Aberto no Gmail!</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>Enviar E-mail ({fixedEmail})</span>
+                  <span>
+                    {currentRecipients.length === 1
+                      ? `Enviar E-mail (${currentRecipients[0]})`
+                      : `Enviar E-mail (${currentRecipients[0]} +${currentRecipients.length - 1})`}
+                  </span>
                 </>
               )}
             </button>
@@ -480,7 +741,7 @@ Oficina Central de Manutenção`;
               className="rounded text-amber-500 focus:ring-amber-500 bg-neutral-900 border-neutral-700"
             />
             <label htmlFor="chk-enable-parts-pdf" className="text-xs text-zinc-300 cursor-pointer font-medium">
-              Ativar e incluir esta folha no documento PDF final
+              Ativar e incluir esta folha no documento PDF final do relatório
             </label>
           </div>
 
@@ -507,3 +768,4 @@ Oficina Central de Manutenção`;
     </div>
   );
 };
+
