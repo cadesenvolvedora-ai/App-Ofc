@@ -125,6 +125,22 @@ export default function App() {
     };
   };
 
+  // Validation function: Check mandatory photo comments
+  const validateReportPhotos = (report: MaintenanceReport) => {
+    const missingIndices: number[] = [];
+    report.photos.forEach((photo, index) => {
+      if (!photo.caption || photo.caption.trim() === '') {
+        missingIndices.push(index);
+      }
+    });
+
+    return {
+      isValid: missingIndices.length === 0,
+      missingCount: missingIndices.length,
+      firstMissingPhotoId: missingIndices.length > 0 ? report.photos[missingIndices[0]].id : null,
+    };
+  };
+
   // Update active report fields
   const handleUpdateActiveReport = (updatedFields: Partial<MaintenanceReport>) => {
     setReports((prev) =>
@@ -269,15 +285,35 @@ export default function App() {
 
   // Attempt to open Export Modal with Validation Check
   const handleOpenExport = () => {
-    const validation = validateReportHeader(activeReport);
-    if (!validation.isValid) {
+    const headerValidation = validateReportHeader(activeReport);
+    if (!headerValidation.isValid) {
       setShowValidationErrors(true);
       showToast(
-        `Preencha os campos obrigatórios do cabeçalho: ${validation.missing.join(', ')}.`,
+        `Preencha os campos obrigatórios do cabeçalho: ${headerValidation.missing.join(', ')}.`,
         'error'
       );
       // Scroll smoothly to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const photoValidation = validateReportPhotos(activeReport);
+    if (!photoValidation.isValid) {
+      setShowValidationErrors(true);
+      showToast(
+        `Comentários obrigatórios pendentes! ${photoValidation.missingCount} foto(s) precisam de comentário técnico antes de gerar o laudo.`,
+        'error'
+      );
+      if (photoValidation.firstMissingPhotoId) {
+        const cardEl = document.getElementById(`photo-card-${photoValidation.firstMissingPhotoId}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const inputEl = document.getElementById(`input-photo-caption-${photoValidation.firstMissingPhotoId}`);
+          if (inputEl) {
+            setTimeout(() => inputEl.focus(), 300);
+          }
+        }
+      }
       return;
     }
 
@@ -286,6 +322,8 @@ export default function App() {
   };
 
   const headerValidation = validateReportHeader(activeReport);
+  const photoValidation = validateReportPhotos(activeReport);
+  const isOverallValid = headerValidation.isValid && photoValidation.isValid;
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sans pb-24 sm:pb-12">
@@ -302,7 +340,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenExportModal={handleOpenExport}
         preconfiguredEmail={settings.preconfiguredEmail}
-        hasValidationErrors={showValidationErrors && !headerValidation.isValid}
+        hasValidationErrors={showValidationErrors && !isOverallValid}
       />
 
       {/* Offline Toast if field connection drops */}
@@ -379,6 +417,7 @@ export default function App() {
           onDeletePhoto={handleDeletePhoto}
           onReorderPhotos={handleReorderPhotos}
           onOpenLiveCamera={() => setIsLiveCameraOpen(true)}
+          showValidationErrors={showValidationErrors}
         />
       </main>
 
@@ -394,7 +433,11 @@ export default function App() {
 
         <button
           onClick={handleOpenExport}
-          className="flex-[1.5] py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 active:scale-95 text-white text-xs font-bold shadow-lg shadow-amber-600/25 flex items-center justify-center gap-1.5 transition"
+          className={`flex-[1.5] py-2.5 rounded-xl text-white text-xs font-bold shadow-lg flex items-center justify-center gap-1.5 transition active:scale-95 ${
+            showValidationErrors && !isOverallValid
+              ? 'bg-amber-600 animate-pulse'
+              : 'bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 shadow-amber-600/25'
+          }`}
         >
           <Mail className="w-4 h-4" />
           <span>Gerar PDF & Gmail</span>

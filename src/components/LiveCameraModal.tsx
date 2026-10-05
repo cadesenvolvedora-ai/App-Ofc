@@ -1,11 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, RefreshCw, Zap, Check, Sparkles } from 'lucide-react';
+import { Camera, X, RefreshCw, Zap, Check, Sparkles, AlertCircle } from 'lucide-react';
 
 interface LiveCameraModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCapture: (dataUrl: string, initialCaption?: string) => void;
 }
+
+const CAMERA_QUICK_SUGGESTIONS = [
+  'Inspeção visual do equipamento',
+  'Desmontagem do conjunto',
+  'Rolamento com avaria',
+  'Desgaste e folga mecânica',
+  'Limpeza e descontaminação',
+  'Montagem final concluída',
+];
 
 export const LiveCameraModal: React.FC<LiveCameraModalProps> = ({
   isOpen,
@@ -19,6 +28,7 @@ export const LiveCameraModal: React.FC<LiveCameraModalProps> = ({
   const [torchOn, setTorchOn] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [quickCaption, setQuickCaption] = useState('');
+  const [captionError, setCaptionError] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -79,6 +89,7 @@ export const LiveCameraModal: React.FC<LiveCameraModalProps> = ({
       }
       setCapturedImage(null);
       setQuickCaption('');
+      setCaptionError('');
     }
 
     return () => {
@@ -128,10 +139,15 @@ export const LiveCameraModal: React.FC<LiveCameraModalProps> = ({
   };
 
   const handleConfirmPhoto = () => {
-    if (capturedImage) {
-      onCapture(capturedImage, quickCaption);
-      onClose();
+    if (!capturedImage) return;
+    if (!quickCaption || quickCaption.trim() === '') {
+      setCaptionError('O comentário desta foto é obrigatório. Digite uma descrição ou selecione uma das sugestões abaixo.');
+      return;
     }
+    onCapture(capturedImage, quickCaption.trim());
+    setQuickCaption('');
+    setCaptionError('');
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -213,31 +229,86 @@ export const LiveCameraModal: React.FC<LiveCameraModalProps> = ({
           {capturedImage ? (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Comentário para esta foto (Opcional agora, pode editar depois):
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span>Comentário Técnico da Foto</span>
+                    <span className="text-rose-400 font-bold">*</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-900 text-rose-300 font-mono border border-rose-800/40">
+                      Obrigatório
+                    </span>
+                  </span>
+                  <span className="text-[10px] text-zinc-400">
+                    Aparecerá no laudo PDF
+                  </span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Mancal com folga e oxidação no anel interno..."
+                  placeholder="Digite o comentário desta foto (ex: Mancal com folga e oxidação)..."
                   value={quickCaption}
-                  onChange={(e) => setQuickCaption(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-800 px-3.5 py-2 rounded-xl text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-500 break-words"
+                  onChange={(e) => {
+                    setQuickCaption(e.target.value);
+                    if (captionError) setCaptionError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleConfirmPhoto();
+                    }
+                  }}
+                  className={`w-full bg-neutral-900 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none transition break-words border ${
+                    captionError
+                      ? 'border-rose-500 bg-rose-950/20 focus:border-rose-400'
+                      : 'border-neutral-800 focus:border-amber-500'
+                  }`}
                 />
+                {captionError && (
+                  <p className="text-[11px] text-rose-400 font-medium flex items-center gap-1 mt-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{captionError}</span>
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center gap-3">
+              {/* Quick suggestions to make comment entry effortless */}
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block mb-1">
+                  Sugestões Rápidas (Toque para preencher):
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto no-scrollbar">
+                  {CAMERA_QUICK_SUGGESTIONS.map((sugg) => (
+                    <button
+                      key={sugg}
+                      type="button"
+                      onClick={() => {
+                        setQuickCaption(sugg);
+                        if (captionError) setCaptionError('');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-zinc-300 text-[11px] border border-neutral-800 transition text-left"
+                    >
+                      + {sugg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
                 <button
-                  onClick={() => setCapturedImage(null)}
+                  type="button"
+                  onClick={() => {
+                    setCapturedImage(null);
+                    setCaptionError('');
+                  }}
                   className="flex-1 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-zinc-300 text-xs sm:text-sm font-semibold border border-neutral-800 transition"
                 >
                   Tirar Outra
                 </button>
                 <button
+                  type="button"
                   onClick={handleConfirmPhoto}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-amber-600/20 transition flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />
-                  Adicionar ao Relatório
+                  Salvar Foto & Comentário
                 </button>
               </div>
             </div>

@@ -10,6 +10,7 @@ import {
   Plus, 
   Sparkles, 
   AlertCircle,
+  CheckCircle2,
   Tag as TagIcon
 } from 'lucide-react';
 import { PhotoRecord } from '../types';
@@ -24,6 +25,7 @@ interface PhotoListProps {
   onDeletePhoto: (id: string) => void;
   onReorderPhotos: (startIndex: number, endIndex: number) => void;
   onOpenLiveCamera: () => void;
+  showValidationErrors?: boolean;
 }
 
 const COMMON_TAGS = ['Antes', 'Durante', 'Avaria', 'Depois', 'Inspeção', 'Montagem'];
@@ -49,6 +51,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
   onDeletePhoto,
   onReorderPhotos,
   onOpenLiveCamera,
+  showValidationErrors = false,
 }) => {
   const photoGalleryInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -59,6 +62,9 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
   const [photoToDelete, setPhotoToDelete] = useState<PhotoRecord | null>(null);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
+
+  // Compute pending mandatory captions
+  const pendingCaptionsCount = photos.filter((p) => !p.caption || p.caption.trim() === '').length;
 
   // Handle Gallery / System Photo Picker Files (Supports single or multiple images!)
   const handlePhotoGalleryFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,6 +192,54 @@ export const PhotoList: React.FC<PhotoListProps> = ({
         </div>
       )}
 
+      {/* Mandatory Comments Warning / Success Status Banner */}
+      {photos.length > 0 && (
+        <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+          pendingCaptionsCount > 0
+            ? showValidationErrors
+              ? 'bg-rose-950/70 border-rose-500/80 text-rose-200 shadow-lg shadow-rose-950/40 ring-1 ring-rose-500/40'
+              : 'bg-amber-950/50 border-amber-600/50 text-amber-200 shadow-md'
+            : 'bg-emerald-950/50 border-emerald-600/40 text-emerald-200'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            {pendingCaptionsCount > 0 ? (
+              <AlertCircle className={`w-5 h-5 flex-shrink-0 ${showValidationErrors ? 'text-rose-400 animate-bounce' : 'text-amber-400'}`} />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold tracking-tight">
+                  {pendingCaptionsCount > 0
+                    ? `Obrigatoriedade: ${pendingCaptionsCount} foto(s) sem comentário técnico`
+                    : 'Todas as fotos possuem comentários obrigatórios preenchidos!'}
+                </span>
+                {pendingCaptionsCount > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-black/60 border border-current">
+                    {photos.length - pendingCaptionsCount} de {photos.length}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-zinc-300 mt-0.5">
+                {pendingCaptionsCount > 0
+                  ? 'Cada foto precisa obrigatoriamente de um comentário descritivo antes da emissão do PDF e envio no Gmail.'
+                  : 'Documentação fotográfica completa e validada para emissão do laudo técnico.'}
+              </p>
+            </div>
+          </div>
+
+          {pendingCaptionsCount > 0 && (
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg self-start sm:self-auto border ${
+              showValidationErrors
+                ? 'bg-rose-900/80 text-rose-200 border-rose-500'
+                : 'bg-amber-900/80 text-amber-200 border-amber-700/60'
+            }`}>
+              {showValidationErrors ? 'Preenchimento Obrigatório' : 'Pendente de Comentário'}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Empty State */}
       {photos.length === 0 && (
         <div className="bg-neutral-950 border-2 border-dashed border-neutral-800 rounded-2xl p-8 sm:p-12 text-center">
@@ -222,141 +276,193 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
       {/* Photo Cards Grid (Optimized for Android Phone & Tablet) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {photos.map((photo, index) => (
-          <div
-            key={photo.id}
-            id={`photo-card-${photo.id}`}
-            className="bg-neutral-950 border border-neutral-800 rounded-2xl overflow-hidden shadow-lg hover:border-neutral-700 transition flex flex-col"
-          >
-            {/* Card Header with Item #, Tag, Reorder & Delete */}
-            <div className="px-4 py-2.5 bg-black border-b border-neutral-800 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-xs font-bold border border-amber-500/30">
-                  Item #{String(index + 1).padStart(2, '0')}
-                </span>
+        {photos.map((photo, index) => {
+          const isCaptionMissing = !photo.caption || photo.caption.trim() === '';
 
-                {/* Tag selector */}
-                <select
-                  value={photo.tag || 'Inspeção'}
-                  onChange={(e) => onUpdatePhoto(photo.id, { tag: e.target.value })}
-                  className="bg-neutral-900 text-zinc-300 border border-neutral-800 text-[11px] rounded-lg px-2 py-1 font-medium focus:outline-none focus:border-amber-500"
-                >
-                  {COMMON_TAGS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Action buttons (Move Up, Move Down, Zoom, Delete) */}
-              <div className="flex items-center gap-1">
-                {/* Reorder Up */}
-                <button
-                  disabled={index === 0}
-                  onClick={() => onReorderPhotos(index, index - 1)}
-                  className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition"
-                  title="Mover foto para cima"
-                >
-                  <ChevronUp className="w-4 h-4" />
-                </button>
-
-                {/* Reorder Down */}
-                <button
-                  disabled={index === photos.length - 1}
-                  onClick={() => onReorderPhotos(index, index + 1)}
-                  className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition"
-                  title="Mover foto para baixo"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-
-                {/* Delete Photo ("opção de apagar a foto caso queira") */}
-                <button
-                  id={`btn-delete-photo-${photo.id}`}
-                  onClick={() => setPhotoToDelete(photo)}
-                  className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition ml-1"
-                  title="Apagar esta foto"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Photo Visual Area */}
-            <div 
-              className="relative bg-black group cursor-pointer aspect-[4/3] flex items-center justify-center overflow-hidden"
-              onClick={() => setSelectedPhotoForZoom({ photo, index })}
+          return (
+            <div
+              key={photo.id}
+              id={`photo-card-${photo.id}`}
+              className={`bg-neutral-950 rounded-2xl overflow-hidden shadow-lg transition-all flex flex-col border ${
+                isCaptionMissing && showValidationErrors
+                  ? 'border-rose-500 shadow-rose-950/50 ring-1 ring-rose-500/50'
+                  : isCaptionMissing
+                  ? 'border-amber-900/60 hover:border-amber-500/60'
+                  : 'border-neutral-800 hover:border-emerald-600/50'
+              }`}
             >
-              <img
-                src={photo.dataUrl}
-                alt={photo.caption || `Foto #${index + 1}`}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                loading="lazy"
-              />
-
-              {/* Hover/Tap Zoom overlay badge */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-semibold backdrop-blur-[2px]">
-                <ZoomIn className="w-5 h-5" />
-                <span>Toque para inspecionar</span>
-              </div>
-
-              {/* Timestamp badge */}
-              {photo.timestamp && (
-                <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-zinc-300 font-mono flex items-center gap-1 border border-neutral-800">
-                  <Clock className="w-3 h-3 text-amber-400" />
-                  {photo.timestamp}
-                </div>
-              )}
-            </div>
-
-            {/* Comment Section Below Photo ("coloque comentários abaixa da foto") */}
-            <div className="p-3.5 sm:p-4 bg-neutral-950 flex-1 flex flex-col justify-between">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1 flex items-center justify-between">
-                  <span>Comentário Técnico da Foto:</span>
-                  <span className="text-[10px] text-zinc-500">
-                    Aparecerá no PDF abaixo da imagem
+              {/* Card Header with Item #, Tag, Reorder & Delete */}
+              <div className="px-4 py-2.5 bg-black border-b border-neutral-800 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-xs font-bold border border-amber-500/30">
+                    Item #{String(index + 1).padStart(2, '0')}
                   </span>
-                </label>
 
-                <textarea
-                  id={`input-photo-caption-${photo.id}`}
-                  rows={2}
-                  value={photo.caption}
-                  onChange={(e) => onUpdatePhoto(photo.id, { caption: e.target.value })}
-                  placeholder="Ex: Mancal com avaria no rolamento, mola montada invertida..."
-                  className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-500 transition leading-relaxed resize-y break-words whitespace-pre-wrap"
-                />
+                  {/* Status Tag indicating mandatory completion */}
+                  {isCaptionMissing ? (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${
+                      showValidationErrors
+                        ? 'bg-rose-950/90 text-rose-300 border-rose-500 animate-pulse'
+                        : 'bg-amber-950/70 text-amber-300 border-amber-700/60'
+                    }`}>
+                      <AlertCircle className="w-3 h-3 text-rose-400" />
+                      <span>Comentário Obrigatório *</span>
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/70 text-emerald-300 border border-emerald-700/60 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span>Comentado</span>
+                    </span>
+                  )}
+
+                  {/* Tag selector */}
+                  <select
+                    value={photo.tag || 'Inspeção'}
+                    onChange={(e) => onUpdatePhoto(photo.id, { tag: e.target.value })}
+                    className="bg-neutral-900 text-zinc-300 border border-neutral-800 text-[11px] rounded-lg px-2 py-1 font-medium focus:outline-none focus:border-amber-500"
+                  >
+                    {COMMON_TAGS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Action buttons (Move Up, Move Down, Zoom, Delete) */}
+                <div className="flex items-center gap-1">
+                  {/* Reorder Up */}
+                  <button
+                    disabled={index === 0}
+                    onClick={() => onReorderPhotos(index, index - 1)}
+                    className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition"
+                    title="Mover foto para cima"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+
+                  {/* Reorder Down */}
+                  <button
+                    disabled={index === photos.length - 1}
+                    onClick={() => onReorderPhotos(index, index + 1)}
+                    className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition"
+                    title="Mover foto para baixo"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+
+                  {/* Delete Photo */}
+                  <button
+                    id={`btn-delete-photo-${photo.id}`}
+                    onClick={() => setPhotoToDelete(photo)}
+                    className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition ml-1"
+                    title="Apagar esta foto"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              {/* Quick Snippet Chips to speed up technicians' typing on mobile */}
-              <div className="mt-2.5">
-                <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">
-                  Sugestões Rápidas:
+              {/* Photo Visual Area */}
+              <div 
+                className="relative bg-black group cursor-pointer aspect-[4/3] flex items-center justify-center overflow-hidden"
+                onClick={() => setSelectedPhotoForZoom({ photo, index })}
+              >
+                <img
+                  src={photo.dataUrl}
+                  alt={photo.caption || `Foto #${index + 1}`}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                  loading="lazy"
+                />
+
+                {/* Hover/Tap Zoom overlay badge */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-semibold backdrop-blur-[2px]">
+                  <ZoomIn className="w-5 h-5" />
+                  <span>Toque para inspecionar</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto no-scrollbar">
-                  {QUICK_SUGGESTIONS.slice(0, 4).map((sugg) => (
-                    <button
-                      key={sugg}
-                      type="button"
-                      onClick={() => {
-                        const newText = photo.caption
-                          ? `${photo.caption} - ${sugg}`
-                          : sugg;
-                        onUpdatePhoto(photo.id, { caption: newText });
-                      }}
-                      className="px-2 py-0.5 rounded-md bg-neutral-900 hover:bg-neutral-800 text-zinc-300 text-[10px] transition truncate max-w-[200px] border border-neutral-800"
-                      title={sugg}
-                    >
-                      + {sugg}
-                    </button>
-                  ))}
+
+                {/* Timestamp badge */}
+                {photo.timestamp && (
+                  <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-zinc-300 font-mono flex items-center gap-1 border border-neutral-800">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    {photo.timestamp}
+                  </div>
+                )}
+              </div>
+
+              {/* Comment Section Below Photo */}
+              <div className="p-3.5 sm:p-4 bg-neutral-950 flex-1 flex flex-col justify-between">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <span>Comentário Técnico da Foto</span>
+                      <span className="text-rose-400 font-bold">*</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+                        isCaptionMissing
+                          ? 'bg-rose-950/70 text-rose-300 border-rose-800/80 font-bold'
+                          : 'bg-emerald-950/70 text-emerald-300 border-emerald-800/80'
+                      }`}>
+                        {isCaptionMissing ? 'Obrigatório' : 'Preenchido'}
+                      </span>
+                    </span>
+                    <span className="text-[10px] text-zinc-500">
+                      Aparecerá no PDF abaixo da imagem
+                    </span>
+                  </label>
+
+                  <textarea
+                    id={`input-photo-caption-${photo.id}`}
+                    rows={2}
+                    value={photo.caption}
+                    onChange={(e) => onUpdatePhoto(photo.id, { caption: e.target.value })}
+                    placeholder="Digite obrigatoriamente o comentário (ex: Mancal com avaria no rolamento, mola montada invertida...)"
+                    className={`w-full bg-black rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none transition leading-relaxed resize-y break-words whitespace-pre-wrap border ${
+                      isCaptionMissing && showValidationErrors
+                        ? 'border-rose-500 focus:border-rose-400 bg-rose-950/20'
+                        : isCaptionMissing
+                        ? 'border-neutral-800 focus:border-amber-500'
+                        : 'border-neutral-800 focus:border-emerald-500'
+                    }`}
+                  />
+
+                  {isCaptionMissing && (
+                    <p className={`text-[11px] mt-1.5 flex items-center gap-1 font-medium ${
+                      showValidationErrors ? 'text-rose-400' : 'text-amber-400/90'
+                    }`}>
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-rose-400" />
+                      <span>Obrigatório preencher o comentário técnico desta foto para liberar o laudo.</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Quick Snippet Chips to speed up technicians' typing on mobile */}
+                <div className="mt-2.5">
+                  <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">
+                    Sugestões Rápidas:
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto no-scrollbar">
+                    {QUICK_SUGGESTIONS.slice(0, 4).map((sugg) => (
+                      <button
+                        key={sugg}
+                        type="button"
+                        onClick={() => {
+                          const newText = photo.caption
+                            ? `${photo.caption} - ${sugg}`
+                            : sugg;
+                          onUpdatePhoto(photo.id, { caption: newText });
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-neutral-900 hover:bg-neutral-800 text-zinc-300 text-[10px] transition truncate max-w-[200px] border border-neutral-800"
+                        title={sugg}
+                      >
+                        + {sugg}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Delete Confirmation Modal */}

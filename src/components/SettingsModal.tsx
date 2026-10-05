@@ -248,6 +248,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
           </div>
 
+          {/* Android Studio Package Download Card */}
+          <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                Projeto Nativo Android Studio (APK)
+              </span>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Baixe o código-fonte empacotado para compilar o APK no Android Studio.
+              </p>
+            </div>
+            <a
+              href="/relatorio-tecnico-android-studio.zip"
+              download="relatorio-tecnico-android-studio.zip"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-amber-400 text-xs font-bold border border-neutral-700 transition active:scale-95 flex-shrink-0"
+            >
+              <span>Baixar ZIP do Projeto</span>
+            </a>
+          </div>
+
           <div className="pt-2 flex items-center justify-between gap-3 border-t border-neutral-800">
             <button
               type="button"
