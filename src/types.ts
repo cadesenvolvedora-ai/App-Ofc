@@ -17,18 +17,21 @@ export interface ReductionAdjustmentSheet {
   eixo: {
     eixoAR: { la: string; loa: string };
     eixoInt: { la: string; loa: string };
+    eixoInt2?: { la: string; loa: string };
     eixoBR: { la: string; loa: string };
     comentarios: string;
   };
   mancal: {
     carcacaAR: { laMedida: string; laProjeto: string; loaMedida: string; loaProjeto: string };
     carcacaInt: { laMedida: string; laProjeto: string; loaMedida: string; loaProjeto: string };
+    carcacaInt2?: { laMedida: string; laProjeto: string; loaMedida: string; loaProjeto: string };
     carcacaBR: { laMedida: string; laProjeto: string; loaMedida: string; loaProjeto: string };
     comentarios: string;
   };
   rolamentos: {
     eixoAR: { laNum: string; laFolga: string; loaNum: string; loaFolga: string };
     eixoInt: { laNum: string; laFolga: string; loaNum: string; loaFolga: string };
+    eixoInt2?: { laNum: string; laFolga: string; loaNum: string; loaFolga: string };
     eixoBR: { laNum: string; laFolga: string; loaNum: string; loaFolga: string };
   };
   engrenamentoComentarios: string;
@@ -36,6 +39,7 @@ export interface ReductionAdjustmentSheet {
   folgasAxiais: {
     eixoAR: { ref: string; med1: string; med2: string };
     eixoInt: { ref: string; med1: string; med2: string };
+    eixoInt2?: { ref: string; med1: string; med2: string };
     eixoBR: { ref: string; med1: string; med2: string };
   };
   servicosComentariosAdicionais: string;

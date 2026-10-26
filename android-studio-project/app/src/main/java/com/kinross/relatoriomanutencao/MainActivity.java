@@ -11,6 +11,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.content.res.Configuration;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -51,8 +53,13 @@ public class MainActivity extends AppCompatActivity {
         requestAppPermissions();
         configureWebView();
 
-        // Carrega o aplicativo 100% puro e offline direto da memória interna do APK (sem depender de URL ou internet)
-        webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+        // Só recarrega a URL se não houver estado previamente salvo (evita reset ao plugar carregador)
+        if (savedInstanceState != null) {
+            webView.restoreState(savedInstanceState);
+        } else {
+            // Carrega o aplicativo 100% puro e offline direto da memória interna do APK (sem depender de URL ou internet)
+            webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+        }
     }
 
     private void requestAppPermissions() {
@@ -89,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
@@ -100,8 +108,10 @@ public class MainActivity extends AppCompatActivity {
         settings.setDisplayZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
+        CookieManager.getInstance().setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
         }
 
         // Adiciona ponte nativa Android para salvar PDF e abrir app oficial do Gmail diretamente
@@ -360,6 +370,36 @@ public class MainActivity extends AppCompatActivity {
 
             uploadMessage.onReceiveValue(results);
             uploadMessage = null;
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Garante que rotação de tela, conexão do carregador ou modo docking não reiniciem a WebView
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (webView != null) {
+            webView.saveState(outState);
+        }
+    }
+
+    @Override
+    protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        if (webView != null) {
+            webView.restoreState(savedInstanceState);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            CookieManager.getInstance().flush();
         }
     }
 

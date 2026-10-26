@@ -134,23 +134,23 @@ export function readFileAsDataURL(file: File): Promise<string> {
         return;
       }
 
-      // Check size: if below 1.5MB, return directly without heavy re-encoding
-      if (file.size < 1.5 * 1024 * 1024) {
+      // Small icons/images under 200KB pass through directly
+      if (file.size < 200 * 1024) {
         resolve(rawDataUrl);
         return;
       }
 
-      // If larger image from high-end smartphone camera (e.g. 12MP-50MP = 5MB-15MB),
-      // scale down gracefully to 1920x1920 max while maintaining sharp technical clarity.
-      // This prevents browser/WebView out-of-memory crashes and makes PDF generation instant.
+      // Standardize industrial photos to max 1600x1600 px with 0.85 quality.
+      // This preserves high-definition inspection clarity for gears, bearings, and tags,
+      // while keeping data size lightweight (~200KB-350KB per photo) to guarantee
+      // instantaneous saving to IndexedDB and zero crashes when charging or docking.
       const img = new Image();
       img.onerror = () => {
-        // Fallback to raw data url if canvas fails
         resolve(rawDataUrl);
       };
       img.onload = () => {
         try {
-          const maxDimension = 1920;
+          const maxDimension = 1600;
           let { width, height } = img;
 
           if (width > maxDimension || height > maxDimension) {
@@ -177,8 +177,8 @@ export function readFileAsDataURL(file: File): Promise<string> {
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Return high quality JPEG
-          const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          // Return crisp, optimized JPEG
+          const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
           resolve(optimizedDataUrl);
         } catch (e) {
           console.warn('Canvas optimization error, falling back to original:', e);

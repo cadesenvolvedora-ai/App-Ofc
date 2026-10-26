@@ -237,79 +237,79 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-neutral-950 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl my-auto flex flex-col text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-2xl my-auto flex flex-col text-slate-900">
         {/* Modal Header */}
-        <div className="px-5 py-4 bg-black border-b border-neutral-800 flex items-center justify-between gap-3">
+        <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              <FileText className="w-5 h-5 text-amber-500" />
+            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-800 border border-amber-300">
+              <FileText className="w-5 h-5 text-amber-700" />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                 Relatório Técnico Pronto
               </h3>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-slate-600">
                 Documento técnico formatado com {report.photos.length} fotos em alta definição.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-neutral-800 transition"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 sm:p-6 space-y-5">
+        <div className="p-5 sm:p-6 space-y-5 bg-white">
           {isGenerating ? (
             <div className="py-16 flex flex-col items-center justify-center text-center">
               <div className="w-12 h-12 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <h4 className="text-sm font-bold text-white">
+              <h4 className="text-sm font-bold text-slate-900">
                 Renderizando PDF Profissional...
               </h4>
-              <p className="text-xs text-zinc-400 mt-1 max-w-sm">
+              <p className="text-xs text-slate-600 mt-1 max-w-sm">
                 Organizando cabeçalhos, metadados, molduras de alta resolução e comentários técnicos.
               </p>
             </div>
           ) : (
             <>
               {/* Document Overview Card */}
-              <div className="bg-black rounded-2xl border border-neutral-800 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-amber-400">
+                    <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
                       TAG: {report.tag || 'N/A'}
                     </span>
-                    <span className="text-zinc-600">•</span>
-                    <span className="text-xs font-mono font-bold text-zinc-300">
+                    <span className="text-slate-400">•</span>
+                    <span className="text-xs font-mono font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded">
                       OS: {report.os || 'N/A'}
                     </span>
                   </div>
-                  <h4 className="text-sm sm:text-base font-bold text-white truncate max-w-md">
+                  <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate max-w-md">
                     {pdfResult?.filename || 'Relatorio_Tecnico.pdf'}
                   </h4>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-slate-600">
                     Formato A4 • {report.photos.length} {report.photos.length === 1 ? 'foto registrada' : 'fotos registradas'} com comentários
                   </p>
                 </div>
 
                 {/* Destination email display */}
-                <div className="bg-neutral-900 px-3.5 py-2.5 rounded-xl border border-neutral-800 text-left sm:text-right w-full sm:w-auto">
-                  <div className="text-[10px] uppercase font-semibold text-zinc-400 flex items-center sm:justify-end gap-1">
-                    <Mail className="w-3 h-3 text-amber-500" />
+                <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 text-left sm:text-right w-full sm:w-auto shadow-xs">
+                  <div className="text-[10px] uppercase font-semibold text-slate-600 flex items-center sm:justify-end gap-1">
+                    <Mail className="w-3 h-3 text-amber-600" />
                     Destinatário Oficial:
                   </div>
-                  <div className="text-xs font-bold text-amber-300 truncate max-w-[240px] font-mono mt-0.5">
+                  <div className="text-xs font-bold text-amber-900 truncate max-w-[240px] font-mono mt-0.5">
                     {(settings.recipientEmails && settings.recipientEmails.length > 0)
                       ? settings.recipientEmails.join(', ')
                       : (settings.preconfiguredEmail || 'paulo.sousa@kinross.com')}
                   </div>
                   <button
                     onClick={onOpenSettings}
-                    className="text-[10px] text-zinc-400 hover:text-amber-400 underline transition mt-1 block sm:inline"
+                    className="text-[10px] text-slate-600 hover:text-amber-700 font-medium underline transition mt-1 block sm:inline cursor-pointer"
                   >
                     Alterar destinatário
                   </button>
@@ -318,8 +318,8 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
 
               {/* Status Notice when email is opened */}
               {emailSentNotice && (
-                <div className="p-3.5 rounded-2xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2.5 animate-fadeIn">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs flex items-center gap-2.5 animate-fadeIn">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>O aplicativo Gmail foi aberto com o destinatário e o texto completo do laudo preenchidos!</span>
                 </div>
               )}
@@ -331,7 +331,7 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                   type="button"
                   id="btn-send-gmail"
                   onClick={handleSendViaGmail}
-                  className="py-4 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-red-500 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white font-bold text-sm shadow-xl shadow-red-600/25 transition flex items-center justify-center gap-2.5 group cursor-pointer"
+                  className="py-4 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-red-500 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white font-bold text-sm shadow-lg shadow-red-500/25 transition flex items-center justify-center gap-2.5 group cursor-pointer"
                 >
                   <Mail className="w-5 h-5 group-hover:scale-110 transition-transform" />
                   <span>Enviar Laudo via Gmail</span>
@@ -343,10 +343,10 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                   id="btn-download-pdf"
                   onClick={handleDownloadPDF}
                   disabled={downloadStatus === 'downloading'}
-                  className={`py-4 px-4 rounded-2xl font-bold text-sm shadow-xl active:scale-95 transition flex items-center justify-center gap-2.5 cursor-pointer ${
+                  className={`py-4 px-4 rounded-2xl font-bold text-sm shadow-lg active:scale-95 transition flex items-center justify-center gap-2.5 cursor-pointer ${
                     downloadStatus === 'success'
-                      ? 'bg-emerald-600 text-white shadow-emerald-600/20'
-                      : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                      : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20'
                   }`}
                 >
                   {downloadStatus === 'downloading' ? (
@@ -369,16 +369,16 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
               </div>
 
               {/* Auxiliary Actions */}
-              <div className="flex items-center justify-between pt-3 border-t border-neutral-800 text-xs">
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-xs">
                 <button
                   type="button"
                   onClick={copySummaryText}
-                  className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition py-1"
+                  className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 transition py-1 font-medium cursor-pointer"
                 >
                   {copiedSummary ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400 font-semibold">Resumo copiado!</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700 font-semibold">Resumo copiado!</span>
                     </>
                   ) : (
                     <>
@@ -388,7 +388,7 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                   )}
                 </button>
 
-                <span className="text-[11px] text-zinc-500 font-medium">
+                <span className="text-[11px] text-slate-500 font-semibold">
                   Tablet & Celular Android
                 </span>
               </div>

@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { 
-  Camera, 
   Image as ImageIcon, 
   Trash2, 
   ChevronUp, 
@@ -24,7 +23,6 @@ interface PhotoListProps {
   onUpdatePhoto: (id: string, updated: Partial<PhotoRecord>) => void;
   onDeletePhoto: (id: string) => void;
   onReorderPhotos: (startIndex: number, endIndex: number) => void;
-  onOpenLiveCamera: () => void;
   showValidationErrors?: boolean;
 }
 
@@ -50,7 +48,6 @@ export const PhotoList: React.FC<PhotoListProps> = ({
   onUpdatePhoto,
   onDeletePhoto,
   onReorderPhotos,
-  onOpenLiveCamera,
   showValidationErrors = false,
 }) => {
   const photoGalleryInputRef = useRef<HTMLInputElement | null>(null);
@@ -130,6 +127,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
       {/* Hidden File Input for Gallery / System Photo Picker */}
       <input
         ref={photoGalleryInputRef}
+        id="native-photo-gallery-input"
         type="file"
         accept="image/*"
         multiple
@@ -142,52 +140,39 @@ export const PhotoList: React.FC<PhotoListProps> = ({
       />
 
       {/* Action Header Card */}
-      <div className="bg-black border border-neutral-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
               Evidências Fotográficas da Manutenção
             </h3>
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-xs font-bold border border-amber-500/30">
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-mono text-xs font-bold border border-amber-300">
               {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}
             </span>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            Tire fotos ao vivo com a câmera do app ou selecione diretamente da galeria do aparelho.
+          <p className="text-xs text-slate-600 mt-1 font-medium">
+            Selecione fotos diretamente da galeria do aparelho para compor as evidências da manutenção.
           </p>
         </div>
 
-        {/* Buttons to Add Photos */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          {/* In-App Live Camera Button */}
-          <button
-            type="button"
-            id="btn-open-live-camera"
-            onClick={onOpenLiveCamera}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 active:scale-95 text-white text-xs sm:text-sm font-bold shadow-md shadow-amber-600/20 transition"
-            title="Tirar foto usando o visor ao vivo no aplicativo"
-          >
-            <Camera className="w-4 h-4" />
-            <span>Tirar Foto (App)</span>
-          </button>
-
-          {/* Galeria de Fotos (Renomeado da Câmera Nativa, botão funcional no Tablet) */}
+        {/* Single Button to Add Photos from Gallery */}
+        <div className="w-full md:w-auto">
           <button
             type="button"
             id="btn-photo-gallery"
             onClick={() => photoGalleryInputRef.current?.click()}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-amber-300 text-xs sm:text-sm font-bold border border-amber-500/30 shadow-md transition"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 active:scale-95 text-white text-xs sm:text-sm font-bold shadow-md shadow-amber-600/20 border border-amber-500/30 transition cursor-pointer"
             title="Selecionar fotos da galeria do tablet ou celular"
           >
-            <ImageIcon className="w-4 h-4 text-amber-400" />
+            <ImageIcon className="w-4 h-4 text-white" />
             <span>Galeria de Fotos</span>
           </button>
         </div>
       </div>
 
       {isProcessingFiles && (
-        <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-          <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center gap-2 font-medium">
+          <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
           <span>Processando imagens em resolução máxima...</span>
         </div>
       )}
@@ -197,15 +182,15 @@ export const PhotoList: React.FC<PhotoListProps> = ({
         <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
           pendingCaptionsCount > 0
             ? showValidationErrors
-              ? 'bg-rose-950/70 border-rose-500/80 text-rose-200 shadow-lg shadow-rose-950/40 ring-1 ring-rose-500/40'
-              : 'bg-amber-950/50 border-amber-600/50 text-amber-200 shadow-md'
-            : 'bg-emerald-950/50 border-emerald-600/40 text-emerald-200'
+              ? 'bg-rose-50 border-rose-300 text-rose-950 shadow-sm'
+              : 'bg-amber-50 border-amber-300 text-amber-950 shadow-xs'
+            : 'bg-emerald-50 border-emerald-300 text-emerald-950 shadow-xs'
         }`}>
           <div className="flex items-center gap-2.5">
             {pendingCaptionsCount > 0 ? (
-              <AlertCircle className={`w-5 h-5 flex-shrink-0 ${showValidationErrors ? 'text-rose-400 animate-bounce' : 'text-amber-400'}`} />
+              <AlertCircle className={`w-5 h-5 flex-shrink-0 ${showValidationErrors ? 'text-rose-600' : 'text-amber-700'}`} />
             ) : (
-              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600" />
             )}
             <div>
               <div className="flex items-center gap-2">
@@ -215,12 +200,12 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                     : 'Todas as fotos possuem comentários obrigatórios preenchidos!'}
                 </span>
                 {pendingCaptionsCount > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-black/60 border border-current">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-white border border-current">
                     {photos.length - pendingCaptionsCount} de {photos.length}
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-zinc-300 mt-0.5">
+              <p className="text-[11px] text-slate-700 mt-0.5 font-medium">
                 {pendingCaptionsCount > 0
                   ? 'Cada foto precisa obrigatoriamente de um comentário descritivo antes da emissão do PDF e envio no Gmail.'
                   : 'Documentação fotográfica completa e validada para emissão do laudo técnico.'}
@@ -231,8 +216,8 @@ export const PhotoList: React.FC<PhotoListProps> = ({
           {pendingCaptionsCount > 0 && (
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg self-start sm:self-auto border ${
               showValidationErrors
-                ? 'bg-rose-900/80 text-rose-200 border-rose-500'
-                : 'bg-amber-900/80 text-amber-200 border-amber-700/60'
+                ? 'bg-rose-100 text-rose-950 border-rose-300'
+                : 'bg-amber-100 text-amber-950 border-amber-300'
             }`}>
               {showValidationErrors ? 'Preenchimento Obrigatório' : 'Pendente de Comentário'}
             </span>
@@ -242,33 +227,25 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
       {/* Empty State */}
       {photos.length === 0 && (
-        <div className="bg-neutral-950 border-2 border-dashed border-neutral-800 rounded-2xl p-8 sm:p-12 text-center">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-neutral-900 flex items-center justify-center text-zinc-400 mb-3">
-            <Camera className="w-7 h-7 text-amber-400" />
+        <div className="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 sm:p-12 text-center shadow-xs">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center text-amber-700 mb-3 border border-amber-200">
+            <ImageIcon className="w-7 h-7 text-amber-600" />
           </div>
-          <h4 className="text-base font-bold text-white mb-1">
+          <h4 className="text-base font-bold text-slate-900 mb-1">
             Nenhuma foto adicionada neste relatório
           </h4>
-          <p className="text-xs text-zinc-400 max-w-md mx-auto mb-6 leading-relaxed">
-            Adicione fotos da desmontagem, avarias encontradas, peças substituídas ou medições para compor o relatório técnico.
+          <p className="text-xs text-slate-600 max-w-md mx-auto mb-6 leading-relaxed font-medium">
+            Selecione as fotos da galeria do seu dispositivo (desmontagem, avarias encontradas, peças substituídas ou medições) para compor o relatório técnico.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={onOpenLiveCamera}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white text-xs sm:text-sm font-bold shadow-md transition"
-            >
-              <Camera className="w-4 h-4" />
-              Tirar Foto Agora
-            </button>
+          <div className="flex items-center justify-center">
             <button
               type="button"
               onClick={() => photoGalleryInputRef.current?.click()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 text-xs sm:text-sm font-bold border border-amber-500/30 transition shadow"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 active:scale-95 text-white text-sm font-bold shadow-md shadow-amber-600/20 border border-amber-500/30 transition cursor-pointer"
             >
-              <ImageIcon className="w-4 h-4 text-amber-400" />
-              Galeria de Fotos
+              <ImageIcon className="w-4 h-4 text-white" />
+              <span>Galeria de Fotos</span>
             </button>
           </div>
         </div>
@@ -283,18 +260,18 @@ export const PhotoList: React.FC<PhotoListProps> = ({
             <div
               key={photo.id}
               id={`photo-card-${photo.id}`}
-              className={`bg-neutral-950 rounded-2xl overflow-hidden shadow-lg transition-all flex flex-col border ${
+              className={`bg-white rounded-2xl overflow-hidden shadow-xs transition-all flex flex-col border ${
                 isCaptionMissing && showValidationErrors
-                  ? 'border-rose-500 shadow-rose-950/50 ring-1 ring-rose-500/50'
+                  ? 'border-rose-500 shadow-sm ring-1 ring-rose-500'
                   : isCaptionMissing
-                  ? 'border-amber-900/60 hover:border-amber-500/60'
-                  : 'border-neutral-800 hover:border-emerald-600/50'
+                  ? 'border-amber-300 hover:border-amber-400'
+                  : 'border-slate-200 hover:border-slate-300'
               }`}
             >
               {/* Card Header with Item #, Tag, Reorder & Delete */}
-              <div className="px-4 py-2.5 bg-black border-b border-neutral-800 flex items-center justify-between gap-2">
+              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-xs font-bold border border-amber-500/30">
+                  <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-mono text-xs font-bold border border-amber-300">
                     Item #{String(index + 1).padStart(2, '0')}
                   </span>
 
@@ -302,15 +279,15 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                   {isCaptionMissing ? (
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${
                       showValidationErrors
-                        ? 'bg-rose-950/90 text-rose-300 border-rose-500 animate-pulse'
-                        : 'bg-amber-950/70 text-amber-300 border-amber-700/60'
+                        ? 'bg-rose-100 text-rose-900 border-rose-300'
+                        : 'bg-amber-100 text-amber-900 border-amber-300'
                     }`}>
-                      <AlertCircle className="w-3 h-3 text-rose-400" />
+                      <AlertCircle className="w-3 h-3 text-rose-600" />
                       <span>Comentário Obrigatório *</span>
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/70 text-emerald-300 border border-emerald-700/60 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-700" />
                       <span>Comentado</span>
                     </span>
                   )}
@@ -319,7 +296,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                   <select
                     value={photo.tag || 'Inspeção'}
                     onChange={(e) => onUpdatePhoto(photo.id, { tag: e.target.value })}
-                    className="bg-neutral-900 text-zinc-300 border border-neutral-800 text-[11px] rounded-lg px-2 py-1 font-medium focus:outline-none focus:border-amber-500"
+                    className="bg-white text-slate-800 border border-slate-300 text-[11px] rounded-lg px-2 py-1 font-semibold focus:outline-none focus:border-amber-600"
                   >
                     {COMMON_TAGS.map((t) => (
                       <option key={t} value={t}>
@@ -335,7 +312,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                   <button
                     disabled={index === 0}
                     onClick={() => onReorderPhotos(index, index - 1)}
-                    className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition"
+                    className="p-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-30 transition"
                     title="Mover foto para cima"
                   >
                     <ChevronUp className="w-4 h-4" />
@@ -345,7 +322,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                   <button
                     disabled={index === photos.length - 1}
                     onClick={() => onReorderPhotos(index, index + 1)}
-                    className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition"
+                    className="p-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-30 transition"
                     title="Mover foto para baixo"
                   >
                     <ChevronDown className="w-4 h-4" />
@@ -355,7 +332,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                   <button
                     id={`btn-delete-photo-${photo.id}`}
                     onClick={() => setPhotoToDelete(photo)}
-                    className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition ml-1"
+                    className="p-1.5 rounded text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition ml-1"
                     title="Apagar esta foto"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -365,7 +342,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
               {/* Photo Visual Area */}
               <div 
-                className="relative bg-black group cursor-pointer aspect-[4/3] flex items-center justify-center overflow-hidden"
+                className="relative bg-slate-900 group cursor-pointer aspect-[4/3] flex items-center justify-center overflow-hidden"
                 onClick={() => setSelectedPhotoForZoom({ photo, index })}
               >
                 <img
@@ -383,7 +360,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
                 {/* Timestamp badge */}
                 {photo.timestamp && (
-                  <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-zinc-300 font-mono flex items-center gap-1 border border-neutral-800">
+                  <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-xs px-2 py-0.5 rounded text-[10px] text-white font-mono flex items-center gap-1 border border-white/20">
                     <Clock className="w-3 h-3 text-amber-400" />
                     {photo.timestamp}
                   </div>
@@ -391,21 +368,21 @@ export const PhotoList: React.FC<PhotoListProps> = ({
               </div>
 
               {/* Comment Section Below Photo */}
-              <div className="p-3.5 sm:p-4 bg-neutral-950 flex-1 flex flex-col justify-between">
+              <div className="p-3.5 sm:p-4 bg-white flex-1 flex flex-col justify-between">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5 flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <span>Comentário Técnico da Foto</span>
-                      <span className="text-rose-400 font-bold">*</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+                      <span className="text-rose-600 font-bold">*</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold border ${
                         isCaptionMissing
-                          ? 'bg-rose-950/70 text-rose-300 border-rose-800/80 font-bold'
-                          : 'bg-emerald-950/70 text-emerald-300 border-emerald-800/80'
+                          ? 'bg-rose-100 text-rose-900 border-rose-300'
+                          : 'bg-emerald-100 text-emerald-900 border-emerald-300'
                       }`}>
                         {isCaptionMissing ? 'Obrigatório' : 'Preenchido'}
                       </span>
                     </span>
-                    <span className="text-[10px] text-zinc-500">
+                    <span className="text-[10px] text-slate-500 font-medium">
                       Aparecerá no PDF abaixo da imagem
                     </span>
                   </label>
@@ -416,20 +393,20 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                     value={photo.caption}
                     onChange={(e) => onUpdatePhoto(photo.id, { caption: e.target.value })}
                     placeholder="Digite obrigatoriamente o comentário (ex: Mancal com avaria no rolamento, mola montada invertida...)"
-                    className={`w-full bg-black rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none transition leading-relaxed resize-y break-words whitespace-pre-wrap border ${
+                    className={`w-full bg-slate-50 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none transition leading-relaxed resize-y break-words whitespace-pre-wrap border ${
                       isCaptionMissing && showValidationErrors
-                        ? 'border-rose-500 focus:border-rose-400 bg-rose-950/20'
+                        ? 'border-rose-500 focus:border-rose-600 bg-rose-50/50'
                         : isCaptionMissing
-                        ? 'border-neutral-800 focus:border-amber-500'
-                        : 'border-neutral-800 focus:border-emerald-500'
+                        ? 'border-slate-300 focus:border-amber-600'
+                        : 'border-slate-300 focus:border-emerald-600'
                     }`}
                   />
 
                   {isCaptionMissing && (
-                    <p className={`text-[11px] mt-1.5 flex items-center gap-1 font-medium ${
-                      showValidationErrors ? 'text-rose-400' : 'text-amber-400/90'
+                    <p className={`text-[11px] mt-1.5 flex items-center gap-1 font-semibold ${
+                      showValidationErrors ? 'text-rose-600' : 'text-amber-800'
                     }`}>
-                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-rose-400" />
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-rose-600" />
                       <span>Obrigatório preencher o comentário técnico desta foto para liberar o laudo.</span>
                     </p>
                   )}
@@ -437,7 +414,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
                 {/* Quick Snippet Chips to speed up technicians' typing on mobile */}
                 <div className="mt-2.5">
-                  <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                     Sugestões Rápidas:
                   </div>
                   <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto no-scrollbar">
@@ -451,7 +428,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                             : sugg;
                           onUpdatePhoto(photo.id, { caption: newText });
                         }}
-                        className="px-2 py-0.5 rounded-md bg-neutral-900 hover:bg-neutral-800 text-zinc-300 text-[10px] transition truncate max-w-[200px] border border-neutral-800"
+                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-medium transition truncate max-w-[200px] border border-slate-200"
                         title={sugg}
                       >
                         + {sugg}
@@ -467,23 +444,23 @@ export const PhotoList: React.FC<PhotoListProps> = ({
 
       {/* Delete Confirmation Modal */}
       {photoToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-black border border-neutral-800 p-5 shadow-2xl text-white">
-            <div className="flex items-center gap-3 mb-3 text-rose-400">
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                <Trash2 className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white border border-slate-200 p-5 shadow-2xl text-slate-900">
+            <div className="flex items-center gap-3 mb-3 text-rose-600">
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200">
+                <Trash2 className="w-5 h-5 text-rose-600" />
               </div>
-              <h3 className="text-base font-bold text-white">
+              <h3 className="text-base font-bold text-slate-900">
                 Apagar Evidência Fotográfica?
               </h3>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+            <p className="text-xs text-slate-600 leading-relaxed mb-4 font-medium">
               Esta ação removerá a imagem e seu comentário do relatório técnico. Deseja prosseguir?
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPhotoToDelete(null)}
-                className="flex-1 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-zinc-300 text-xs font-semibold border border-neutral-800 transition"
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition"
               >
                 Cancelar
               </button>
@@ -492,7 +469,7 @@ export const PhotoList: React.FC<PhotoListProps> = ({
                   onDeletePhoto(photoToDelete.id);
                   setPhotoToDelete(null);
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-sm"
               >
                 Sim, Apagar
               </button>

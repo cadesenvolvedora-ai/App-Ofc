@@ -81,18 +81,18 @@ define(['./workbox-7e5eb42b'], (function (workbox) { 'use strict';
     "revision": "402b66900e731ca748771b6fc5e7a068"
   }, {
     "url": "index.html",
-    "revision": "fbed155dcb463748e46e16072313c6cb"
+    "revision": "38f97b5c9f2f42bf8f8363ce675d00bf"
   }, {
     "url": "assets/purify.es-DedTAGkB.js",
     "revision": null
   }, {
-    "url": "assets/index.es-B1wgSfC6.js",
+    "url": "assets/index.es-CxgaRQNj.js",
     "revision": null
   }, {
-    "url": "assets/index-Ddf3npUt.js",
+    "url": "assets/index-DNG1fS6M.css",
     "revision": null
   }, {
-    "url": "assets/index-B_wcyeP8.css",
+    "url": "assets/index-CIDOjabJ.js",
     "revision": null
   }, {
     "url": "assets/html2canvas.esm-QH1iLAAe.js",

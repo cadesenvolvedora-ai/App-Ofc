@@ -18,15 +18,15 @@ export const PhotoZoomModal: React.FC<PhotoZoomModalProps> = ({
   if (!photo) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-3 sm:p-6">
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-neutral-950 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 backdrop-blur-md p-3 sm:p-6">
+      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
         {/* Top header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-black border-b border-neutral-800">
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 font-mono text-xs font-bold border border-amber-500/30">
+            <span className="px-2.5 py-1 rounded bg-amber-100 text-amber-900 font-mono text-xs font-bold border border-amber-300">
               #{String(index + 1).padStart(2, '0')}
             </span>
-            <span className="text-sm font-semibold text-white truncate max-w-[240px] sm:max-w-md">
+            <span className="text-sm font-bold text-slate-900 truncate max-w-[240px] sm:max-w-md">
               Inspeção em Alta Definição
             </span>
           </div>
@@ -38,7 +38,7 @@ export const PhotoZoomModal: React.FC<PhotoZoomModalProps> = ({
                   onDelete(photo.id);
                   onClose();
                 }}
-                className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600 transition"
+                className="p-1.5 rounded-lg text-rose-600 hover:text-white hover:bg-rose-600 transition cursor-pointer"
                 title="Apagar esta foto"
               >
                 <Trash2 className="w-4 h-4" />
@@ -46,7 +46,7 @@ export const PhotoZoomModal: React.FC<PhotoZoomModalProps> = ({
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-neutral-800 transition"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -54,7 +54,7 @@ export const PhotoZoomModal: React.FC<PhotoZoomModalProps> = ({
         </div>
 
         {/* Full Image container */}
-        <div className="flex-1 overflow-auto p-2 sm:p-4 flex items-center justify-center bg-black">
+        <div className="flex-1 overflow-auto p-2 sm:p-4 flex items-center justify-center bg-slate-950">
           <img
             src={photo.dataUrl}
             alt={photo.caption || 'Foto do equipamento'}
@@ -63,21 +63,21 @@ export const PhotoZoomModal: React.FC<PhotoZoomModalProps> = ({
         </div>
 
         {/* Caption & Metadata Footer with text wrapping */}
-        <div className="p-4 bg-neutral-950 border-t border-neutral-800">
+        <div className="p-4 bg-white border-t border-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+            <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
               Comentário Técnico da Foto:
             </span>
-            <div className="flex items-center gap-3 text-zinc-400 text-xs font-mono">
+            <div className="flex items-center gap-3 text-slate-600 text-xs font-mono">
               {photo.tag && (
-                <span className="px-2 py-0.5 rounded bg-neutral-900 text-zinc-300 text-[11px] border border-neutral-800">
+                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[11px] border border-slate-300 font-bold">
                   Tag: {photo.tag}
                 </span>
               )}
-              {photo.timestamp && <span>{photo.timestamp}</span>}
+              {photo.timestamp && <span className="font-semibold text-slate-700">{photo.timestamp}</span>}
             </div>
           </div>
-          <p className="text-xs sm:text-sm text-zinc-200 bg-black p-3 rounded-xl border border-neutral-800 leading-relaxed font-sans break-words whitespace-pre-wrap">
+          <p className="text-xs sm:text-sm text-slate-900 bg-slate-50 p-3 rounded-xl border border-slate-300 leading-relaxed font-sans break-words whitespace-pre-wrap font-medium">
             {photo.caption || 'Sem comentário registrado para esta foto.'}
           </p>
         </div>

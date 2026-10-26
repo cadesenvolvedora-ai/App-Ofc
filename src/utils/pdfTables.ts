@@ -175,6 +175,7 @@ export function renderAdjustmentSheetPDF(
   const eixoRows = [
     { name: 'Eixo A.R.', data: sheet.eixo.eixoAR },
     { name: 'Eixo Int.', data: sheet.eixo.eixoInt },
+    { name: 'Base Rol. Eixo Int. 2', data: sheet.eixo.eixoInt2 || { la: '', loa: '' } },
     { name: 'Eixo B.R.', data: sheet.eixo.eixoBR },
   ];
 
@@ -220,6 +221,7 @@ export function renderAdjustmentSheetPDF(
   const mancalRows = [
     { name: 'Carcaça Eixo A.R.', data: sheet.mancal.carcacaAR },
     { name: 'Carcaça Eixo Int.', data: sheet.mancal.carcacaInt },
+    { name: 'Carcaça Eixo Int. 2', data: sheet.mancal.carcacaInt2 || { laMedida: '', laProjeto: '', loaMedida: '', loaProjeto: '' } },
     { name: 'Carcaça Eixo B.R.', data: sheet.mancal.carcacaBR },
   ];
 
@@ -264,6 +266,7 @@ export function renderAdjustmentSheetPDF(
   const rolRows = [
     { name: 'Eixo A.R.', data: sheet.rolamentos.eixoAR },
     { name: 'Eixo Int.', data: sheet.rolamentos.eixoInt },
+    { name: 'Eixo Intermediário 2', data: sheet.rolamentos.eixoInt2 || { laNum: '', laFolga: '', loaNum: '', loaFolga: '' } },
     { name: 'Eixo B.R.', data: sheet.rolamentos.eixoBR },
   ];
 
@@ -325,7 +328,7 @@ export function renderAdjustmentSheetPDF(
   pdf.text('MED. 2', MARGIN + 68, currentY + 3.2);
 
   // Col 2 Box for Engrenamento
-  const notesHeight = 21;
+  const notesHeight = 26.5;
   pdf.setFillColor(theme.lightBg[0], theme.lightBg[1], theme.lightBg[2]);
   pdf.rect(col2X, currentY, halfWidth, notesHeight, 'FD');
   pdf.setFont('helvetica', 'normal');
@@ -334,7 +337,7 @@ export function renderAdjustmentSheetPDF(
   const engText = pdf.splitTextToSize(`Engrenamento: ${sheet.engrenamentoComentarios || 'Conforme projeto.'}`, halfWidth - 4);
   const carcText = pdf.splitTextToSize(`Carcaça: ${sheet.carcacaComentarios || 'Sem trincas ou deformações.'}`, halfWidth - 4);
   pdf.text(engText, col2X + 2, currentY + 4);
-  pdf.text(carcText, col2X + 2, currentY + 12);
+  pdf.text(carcText, col2X + 2, currentY + 14);
 
   currentY += 4.5;
 
@@ -342,6 +345,7 @@ export function renderAdjustmentSheetPDF(
   const folgaRows = [
     { name: 'Eixo A.R.', data: sheet.folgasAxiais.eixoAR },
     { name: 'Eixo Int.', data: sheet.folgasAxiais.eixoInt },
+    { name: 'Eixo Intermediário 2', data: sheet.folgasAxiais.eixoInt2 || { ref: '', med1: '', med2: '' } },
     { name: 'Eixo B.R.', data: sheet.folgasAxiais.eixoBR },
   ];
 

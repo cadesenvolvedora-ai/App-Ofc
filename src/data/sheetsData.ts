@@ -17,18 +17,21 @@ export function createDefaultAdjustmentSheet(): ReductionAdjustmentSheet {
     eixo: {
       eixoAR: { la: '', loa: '' },
       eixoInt: { la: '', loa: '' },
+      eixoInt2: { la: '', loa: '' },
       eixoBR: { la: '', loa: '' },
       comentarios: '',
     },
     mancal: {
       carcacaAR: { laMedida: '', laProjeto: '', loaMedida: '', loaProjeto: '' },
       carcacaInt: { laMedida: '', laProjeto: '', loaMedida: '', loaProjeto: '' },
+      carcacaInt2: { laMedida: '', laProjeto: '', loaMedida: '', loaProjeto: '' },
       carcacaBR: { laMedida: '', laProjeto: '', loaMedida: '', loaProjeto: '' },
       comentarios: '',
     },
     rolamentos: {
       eixoAR: { laNum: '', laFolga: '', loaNum: '', loaFolga: '' },
       eixoInt: { laNum: '', laFolga: '', loaNum: '', loaFolga: '' },
+      eixoInt2: { laNum: '', laFolga: '', loaNum: '', loaFolga: '' },
       eixoBR: { laNum: '', laFolga: '', loaNum: '', loaFolga: '' },
     },
     engrenamentoComentarios: '',
@@ -36,6 +39,7 @@ export function createDefaultAdjustmentSheet(): ReductionAdjustmentSheet {
     folgasAxiais: {
       eixoAR: { ref: '', med1: '', med2: '' },
       eixoInt: { ref: '', med1: '', med2: '' },
+      eixoInt2: { ref: '', med1: '', med2: '' },
       eixoBR: { ref: '', med1: '', med2: '' },
     },
     servicosComentariosAdicionais: '',
@@ -324,10 +328,10 @@ export function createDefaultProcedureMancais(): ProcedureSheet {
 export function hasAdjustmentSheetData(sheet?: ReductionAdjustmentSheet): boolean {
   if (!sheet) return false;
   const { eixo, mancal, rolamentos, folgasAxiais } = sheet;
-  if (eixo.eixoAR.la || eixo.eixoAR.loa || eixo.eixoInt.la || eixo.eixoInt.loa || eixo.eixoBR.la || eixo.eixoBR.loa) return true;
-  if (mancal.carcacaAR.laMedida || mancal.carcacaAR.loaMedida || mancal.carcacaInt.laMedida || mancal.carcacaBR.laMedida) return true;
-  if (rolamentos.eixoAR.laNum || rolamentos.eixoAR.laFolga || rolamentos.eixoInt.laNum || rolamentos.eixoBR.laNum) return true;
-  if (folgasAxiais.eixoAR.med1 || folgasAxiais.eixoInt.med1 || folgasAxiais.eixoBR.med1) return true;
+  if (eixo.eixoAR.la || eixo.eixoAR.loa || eixo.eixoInt.la || eixo.eixoInt.loa || eixo.eixoInt2?.la || eixo.eixoInt2?.loa || eixo.eixoBR.la || eixo.eixoBR.loa) return true;
+  if (mancal.carcacaAR.laMedida || mancal.carcacaAR.loaMedida || mancal.carcacaInt.laMedida || mancal.carcacaInt2?.laMedida || mancal.carcacaBR.laMedida) return true;
+  if (rolamentos.eixoAR.laNum || rolamentos.eixoAR.laFolga || rolamentos.eixoInt.laNum || rolamentos.eixoInt2?.laNum || rolamentos.eixoBR.laNum) return true;
+  if (folgasAxiais.eixoAR.med1 || folgasAxiais.eixoInt.med1 || folgasAxiais.eixoInt2?.med1 || folgasAxiais.eixoBR.med1) return true;
   if (sheet.servicosComentariosAdicionais || sheet.engrenamentoComentarios || sheet.carcacaComentarios) return true;
   return false;
 }

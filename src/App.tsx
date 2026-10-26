@@ -4,26 +4,33 @@ import { createEmptyReport } from './data/sampleReport';
 import { Header } from './components/Header';
 import { ReportHeaderForm } from './components/ReportHeaderForm';
 import { PhotoList } from './components/PhotoList';
-import { LiveCameraModal } from './components/LiveCameraModal';
 import { ExportModal } from './components/ExportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { 
-  Camera, 
   Image as ImageIcon, 
   Mail, 
   CheckCircle2, 
   AlertTriangle, 
   Smartphone, 
-  FileCheck,
-  ShieldCheck,
-  RotateCcw
+  FileCheck, 
+  ShieldCheck, 
+  RotateCcw 
 } from 'lucide-react';
+import {
+  requestPersistentStorage,
+  saveReportsToDB,
+  loadReportsFromDB,
+  saveSettingsToDB,
+  loadSettingsFromDB,
+  saveActiveReportIdToDB,
+  loadActiveReportIdFromDB,
+} from './utils/storage';
 
 const STORAGE_KEY_REPORTS = 'ais_maintenance_reports_v3';
 const STORAGE_KEY_SETTINGS = 'ais_maintenance_settings_v2';
 
 export default function App() {
-  // Load initial settings
+  // Load initial settings with fallback
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
@@ -40,14 +47,13 @@ export default function App() {
     };
   });
 
-  // Load reports list (multi-tabs) - Starts with a clean blank report
+  // Load reports list - Starts with synchronous localStorage cache or clean blank report
   const [reports, setReports] = useState<MaintenanceReport[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_REPORTS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out any leftover sample reports
           const nonSample = parsed.filter((r: any) => r.id !== 'rep_sample_01');
           if (nonSample.length > 0) {
             return nonSample;
@@ -57,7 +63,6 @@ export default function App() {
     } catch (e) {
       console.error('Error loading reports from localStorage', e);
     }
-    // Clean initial blank report
     return [createEmptyReport(1)];
   });
 
@@ -65,14 +70,13 @@ export default function App() {
     return reports[0]?.id || '';
   });
 
-  // UI Modals
-  const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
+  // UI Modals & State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Online status for Android PWA offline field support
+  // Online status for Android offline field support
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -86,23 +90,121 @@ export default function App() {
     };
   }, []);
 
-  // Persist reports to localStorage
+  const [isStorageInitialized, setIsStorageInitialized] = useState(false);
+
+  // Refs for emergency flushing on pagehide / visibilitychange / charger dock
+  const reportsRef = useRef(reports);
+  reportsRef.current = reports;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const activeReportIdRef = useRef(activeReportId);
+  activeReportIdRef.current = activeReportId;
+
+  // Initialize persistent IndexedDB on startup
   useEffect(() => {
+    let isMounted = true;
+
+    async function initPersistentData() {
+      // 1. Request persistent storage permission from Android/Chromium WebView
+      await requestPersistentStorage();
+
+      // 2. Load from IndexedDB
+      try {
+        const [dbReports, dbSettings, dbActiveId] = await Promise.all([
+          loadReportsFromDB(),
+          loadSettingsFromDB(),
+          loadActiveReportIdFromDB(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (dbReports && Array.isArray(dbReports) && dbReports.length > 0) {
+          setReports(dbReports);
+          if (dbActiveId && dbReports.some((r) => r.id === dbActiveId)) {
+            setActiveReportId(dbActiveId);
+          } else {
+            setActiveReportId(dbReports[0].id);
+          }
+        } else {
+          // If IndexedDB was empty, seed it with initial reports
+          saveReportsToDB(reportsRef.current);
+        }
+
+        if (dbSettings) {
+          setSettings(dbSettings);
+        } else {
+          saveSettingsToDB(settingsRef.current);
+        }
+      } catch (err) {
+        console.error('[Storage] Error during initial IndexedDB load:', err);
+      } finally {
+        if (isMounted) {
+          setIsStorageInitialized(true);
+        }
+      }
+    }
+
+    initPersistentData();
+
+    // 3. Android lifecycle event listeners: save immediately when app is paused, backgrounded, or power connected
+    const flushData = () => {
+      if (reportsRef.current && reportsRef.current.length > 0) {
+        saveReportsToDB(reportsRef.current);
+        saveSettingsToDB(settingsRef.current);
+        if (activeReportIdRef.current) {
+          saveActiveReportIdToDB(activeReportIdRef.current);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushData();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushData);
+    window.addEventListener('pagehide', flushData);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      flushData();
+      window.removeEventListener('beforeunload', flushData);
+      window.removeEventListener('pagehide', flushData);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Save reports to IndexedDB and fallback localStorage on state changes
+  useEffect(() => {
+    // Save to IndexedDB
+    saveReportsToDB(reports);
+
+    // Save lightweight fallback to localStorage
     try {
       localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports));
-    } catch (e) {
-      console.error('Failed to save reports to localStorage', e);
+    } catch {
+      // Ignore localStorage 5MB quota errors; IndexedDB handles unlimited photo storage
     }
   }, [reports]);
 
-  // Persist settings to localStorage
+  // Save settings to IndexedDB and localStorage
   useEffect(() => {
+    saveSettingsToDB(settings);
     try {
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
-    } catch (e) {
-      console.error('Failed to save settings to localStorage', e);
+    } catch {
+      // Ignore
     }
   }, [settings]);
+
+  // Save activeReportId to IndexedDB
+  useEffect(() => {
+    if (activeReportId) {
+      saveActiveReportIdToDB(activeReportId);
+    }
+  }, [activeReportId]);
 
   // Find currently active report
   const activeReport = reports.find((r) => r.id === activeReportId) || reports[0];
@@ -326,7 +428,7 @@ export default function App() {
   const isOverallValid = headerValidation.isValid && photoValidation.isValid;
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans pb-24 sm:pb-12">
+    <div className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col font-sans pb-24 sm:pb-12">
       {/* Top Application Bar & Multi-Tab Switcher */}
       <Header
         reports={reports}
@@ -345,7 +447,7 @@ export default function App() {
 
       {/* Offline Toast if field connection drops */}
       {!isOnline && (
-        <div className="bg-amber-600 text-white text-xs font-semibold px-4 py-1.5 text-center flex items-center justify-center gap-2">
+        <div className="bg-amber-600 text-white text-xs font-semibold px-4 py-1.5 text-center flex items-center justify-center gap-2 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-white animate-ping" />
           <span>Modo Offline: Suas fotos e relatórios continuam sendo salvos localmente no dispositivo.</span>
         </div>
@@ -354,46 +456,46 @@ export default function App() {
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`fixed top-16 right-4 z-50 max-w-sm p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex items-center gap-3 transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
+          className={`fixed top-16 right-4 z-50 max-w-sm p-4 rounded-2xl shadow-xl border backdrop-blur-md flex items-center gap-3 transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
             toastMessage.type === 'error'
-              ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+              ? 'bg-rose-50 border-rose-300 text-rose-900'
               : toastMessage.type === 'success'
-              ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
-              : 'bg-neutral-900/95 border-amber-500/50 text-amber-200'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+              : 'bg-white border-amber-300 text-amber-950'
           }`}
         >
           {toastMessage.type === 'error' ? (
-            <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
           ) : (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
           )}
-          <span className="text-xs font-medium leading-snug">{toastMessage.text}</span>
+          <span className="text-xs font-semibold leading-snug">{toastMessage.text}</span>
         </div>
       )}
 
       {/* Main Responsive Work Area (Mobile & Tablet) */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
         {/* Tab Metadata Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-neutral-800">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-amber-400 font-mono">
+            <span className="text-xs font-bold text-amber-700 font-mono tracking-wide">
               ABA ATIVA:
             </span>
-            <span className="text-xs font-semibold text-white">
+            <span className="text-xs font-bold text-slate-900">
               {activeReport.tag ? `${activeReport.tag}` : activeReport.title}
             </span>
             {activeReport.os && (
-              <span className="text-[11px] text-zinc-400 font-mono">
+              <span className="text-[11px] text-slate-600 font-mono font-medium">
                 (OS #{activeReport.os})
               </span>
             )}
           </div>
 
-          <div className="text-[11px] text-zinc-400 flex items-center gap-2">
+          <div className="text-[11px] text-slate-600 flex items-center gap-2 font-medium">
             <span>{activeReport.photos.length} evidências fotográficas</span>
             <span>•</span>
-            <span className="text-emerald-400 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
+            <span className="text-emerald-700 flex items-center gap-1 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               Salvo automaticamente
             </span>
           </div>
@@ -406,9 +508,18 @@ export default function App() {
           showValidationErrors={showValidationErrors}
           preconfiguredEmail={settings.preconfiguredEmail}
           settings={settings}
+          onUpdateAppSettings={(newSettings) => {
+            setSettings(newSettings);
+            saveSettingsToDB(newSettings);
+            try {
+              localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
+            } catch (e) {
+              console.warn(e);
+            }
+          }}
         />
 
-        {/* Section 2: Photographic Records (Gallery & Camera with captions) */}
+        {/* Section 2: Photographic Records (Gallery with mandatory captions) */}
         <PhotoList
           photos={activeReport.photos}
           onAddPhoto={handleAddPhoto}
@@ -416,50 +527,36 @@ export default function App() {
           onUpdatePhoto={handleUpdatePhoto}
           onDeletePhoto={handleDeletePhoto}
           onReorderPhotos={handleReorderPhotos}
-          onOpenLiveCamera={() => setIsLiveCameraOpen(true)}
           showValidationErrors={showValidationErrors}
         />
       </main>
 
       {/* Sticky Bottom Action Bar for Android Mobile Devices */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30 bg-black/95 border-t border-neutral-800 p-2.5 backdrop-blur-md flex items-center justify-between gap-2">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 border-t border-slate-200 p-2.5 backdrop-blur-md flex items-center justify-between gap-2 shadow-lg">
         <button
-          onClick={() => setIsLiveCameraOpen(true)}
-          className="flex-1 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-400 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 border border-neutral-800"
+          type="button"
+          onClick={() => {
+            const input = document.getElementById('native-photo-gallery-input') as HTMLInputElement;
+            input?.click();
+          }}
+          className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 border border-slate-300"
         >
-          <Camera className="w-4 h-4" />
-          <span>Tirar Foto</span>
+          <ImageIcon className="w-4 h-4 text-amber-600" />
+          <span>Galeria de Fotos</span>
         </button>
 
         <button
           onClick={handleOpenExport}
-          className={`flex-[1.5] py-2.5 rounded-xl text-white text-xs font-bold shadow-lg flex items-center justify-center gap-1.5 transition active:scale-95 ${
+          className={`flex-[1.5] py-2.5 rounded-xl text-white text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 ${
             showValidationErrors && !isOverallValid
               ? 'bg-amber-600 animate-pulse'
-              : 'bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 shadow-amber-600/25'
+              : 'bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 shadow-amber-600/25'
           }`}
         >
           <Mail className="w-4 h-4" />
           <span>Gerar PDF & Gmail</span>
         </button>
       </div>
-
-      {/* Live Camera Viewfinder Modal */}
-      <LiveCameraModal
-        isOpen={isLiveCameraOpen}
-        onClose={() => setIsLiveCameraOpen(false)}
-        onCapture={(dataUrl, caption) => {
-          const now = new Date();
-          const timeStr = `${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-          handleAddPhoto({
-            id: `p_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            dataUrl,
-            caption: caption || '',
-            tag: 'Inspeção',
-            timestamp: timeStr,
-          });
-        }}
-      />
 
       {/* PDF Export & Gmail Dispatch Modal */}
       <ExportModal
