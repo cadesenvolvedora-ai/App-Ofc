@@ -21,25 +21,53 @@
     <script>
       // Suppress harmless Vite HMR WebSocket notice in environments where HMR is intentionally disabled
       window.addEventListener('error', function(e) {
-        if (e && e.message && (e.message.includes('ws is undefined') || e.message.includes('send') && e.message.includes('ws'))) {
+        var msg = (e && e.message) ? String(e.message) : '';
+        if (
+          msg.includes('ws is undefined') || 
+          msg.includes('can\'t access property "send"') || 
+          msg.includes('cannot access property "send"') || 
+          (msg.includes('send') && msg.includes('ws'))
+        ) {
           e.stopImmediatePropagation();
           e.preventDefault();
           return true;
         }
       }, true);
       window.addEventListener('unhandledrejection', function(e) {
-        if (e && e.reason && String(e.reason).includes('ws')) {
+        var reason = (e && e.reason) ? String(e.reason) : '';
+        if (
+          reason.includes('ws is undefined') || 
+          reason.includes('can\'t access property "send"') || 
+          reason.includes('cannot access property "send"') || 
+          (reason.includes('send') && reason.includes('ws'))
+        ) {
           e.preventDefault();
           e.stopImmediatePropagation();
         }
       });
 
+      // In development mode, unregister any stale service workers that may cache mismatched Vite chunks
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js').catch(function(err) {
-            console.warn('SW registration failed:', err);
+        if (location.hostname.includes('ais-dev-') || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
           });
-        });
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              for (var i = 0; i < keys.length; i++) {
+                caches.delete(keys[i]);
+              }
+            });
+          }
+        } else {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js').catch(function(err) {
+              console.warn('SW registration failed:', err);
+            });
+          });
+        }
       }
     </script>
   </head>
