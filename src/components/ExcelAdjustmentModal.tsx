@@ -349,7 +349,7 @@ export const ExcelAdjustmentModal: React.FC<ExcelAdjustmentModalProps> = ({
                       placeholder="Medida LOA (ex: 110.018)"
                       value={data.eixo.eixoInt2?.loa || ''}
                       onChange={(e) => handleFieldChange('eixo.eixoInt2.loa', e.target.value)}
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                      className="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 font-mono text-xs focus:border-emerald-600 focus:outline-none"
                     />
                   </div>
                 </div>

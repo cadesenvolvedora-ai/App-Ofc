@@ -599,10 +599,10 @@ Oficina Central de Manutenção - Kinross Brasil Mineração`;
               <button
                 type="button"
                 onClick={() => handleAddRecipientEmail()}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs transition shadow-xs flex-shrink-0"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs transition shadow-xs flex-shrink-0 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Fixar Novo E-mail</span>
+                <span>Fixar Novo E-mail</span>
               </button>
             </div>
 
@@ -626,10 +626,10 @@ Oficina Central de Manutenção - Kinross Brasil Mineração`;
                 <button
                   type="button"
                   onClick={handleAddItem}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition shadow-xs"
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Adicionar Linha</span>
+                  <span>Adicionar Linha</span>
                 </button>
 
                 <button

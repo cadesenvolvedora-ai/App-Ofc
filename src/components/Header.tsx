@@ -160,11 +160,11 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           id="btn-new-report-tab"
           onClick={onCreateNewReport}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-amber-800 hover:text-amber-900 text-xs font-bold border border-slate-300 shadow-xs transition active:scale-95 flex-shrink-0"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-amber-800 hover:text-amber-900 text-xs font-bold border border-slate-300 shadow-xs transition active:scale-95 flex-shrink-0 cursor-pointer"
           title="Abrir uma nova aba de relatório em branco sem perder os anteriores"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>+ Nova Aba</span>
+          <span>Nova Aba</span>
         </button>
       </div>
 
