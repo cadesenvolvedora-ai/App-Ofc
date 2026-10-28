@@ -96,7 +96,8 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        webView.clearCache(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
