@@ -10,9 +10,7 @@ import {
   ShieldCheck, 
   Zap, 
   WifiOff, 
-  Camera,
-  FolderArchive,
-  Terminal
+  Camera
 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
@@ -66,46 +64,6 @@ export const ApkDownloadModal: React.FC<ApkDownloadModalProps> = ({ isOpen, onCl
 
         {/* Modal Body */}
         <div className="p-6 space-y-5 text-slate-800 text-sm max-h-[80vh] overflow-y-auto bg-white">
-          {/* Option: Download ZIP for Android Studio */}
-          <div className="rounded-xl bg-amber-50/60 border-2 border-amber-300 p-4 relative overflow-hidden shadow-xs">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-200 text-amber-900 border border-amber-400">
-                <FolderArchive className="w-3.5 h-3.5 text-amber-800" /> CÓDIGO COMPLETO + ANDROID STUDIO
-              </span>
-              <span className="text-[11px] text-amber-900 font-mono font-bold">Arquivo .ZIP</span>
-            </div>
-
-            <h3 className="font-bold text-slate-900 text-sm mb-1 flex items-center gap-2">
-              Baixar Projeto Android Studio 100% Offline (Android Puro)
-            </h3>
-            <p className="text-xs text-slate-700 leading-relaxed mb-3">
-              O projeto agora possui <strong>todos os arquivos HTML, scripts, estilos e recursos embutidos diretamente dentro do APK</strong> (pasta <code>assets/</code>). O aplicativo funciona de forma 100% autônoma e offline no celular, sem abrir URLs externas e sem perigo de "page not found".
-            </p>
-
-            <a
-              href="/relatorio-tecnico-android-studio.zip"
-              download="relatorio-tecnico-android-studio.zip"
-              className="w-full py-3 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-600/20 transition active:scale-95 cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>Baixar Arquivo ZIP Agora (Código + Android Studio)</span>
-            </a>
-
-            <div className="mt-3 bg-white rounded-lg p-3 border border-amber-200 text-xs space-y-1.5">
-              <p className="font-bold text-amber-900 flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-amber-700" />
-                Passo a passo no Android Studio:
-              </p>
-              <ol className="list-decimal list-inside space-y-1 text-slate-700 text-[11px] font-medium">
-                <li>Baixe o ZIP e extraia a pasta no seu computador.</li>
-                <li>No Android Studio, clique em <strong>File &gt; Open</strong> e selecione a pasta <strong>android-studio-project</strong>.</li>
-                <li>Aguarde o Gradle sincronizar as dependências.</li>
-                <li>Vá no menu superior: <strong>Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</strong>.</li>
-                <li>Pronto! O arquivo <code>app-debug.apk</code> será gerado na pasta <code>app/build/outputs/apk/debug/</code>.</li>
-              </ol>
-            </div>
-          </div>
-
           {/* Method 1: Direct Android Installation (PWA / Recommended) */}
           <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 relative overflow-hidden">
             <div className="flex items-center justify-between gap-2 mb-2">

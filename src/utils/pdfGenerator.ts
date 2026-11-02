@@ -13,16 +13,109 @@ import {
   renderMotorSheetPDF
 } from './pdfTables';
 
+export type PDFReportPart = 'all' | 'part1' | 'part2';
+
+export interface PDFGenerationOptions {
+  part?: PDFReportPart;
+  compressImages?: boolean;
+}
+
 export interface PDFGenerationResult {
   blob: Blob;
   blobUrl: string;
   filename: string;
+  sizeBytes: number;
+  sizeMB: number;
+  sizeFormatted: string;
+  part: PDFReportPart;
+  totalPages: number;
+  photosCount: number;
+  totalPhotosInReport: number;
+  isOverCorporateLimit: boolean;
+}
+
+// Compress and resize image specifically before jsPDF embedding to guarantee lightweight PDFs under corporate 15 MB limits
+export function compressImageForPDF(dataUrl: string, maxDimension = 1200, quality = 0.72): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) {
+      resolve(dataUrl);
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        let { width, height } = img;
+        // If image is already smaller than maxDimension and lightweight, pass through
+        if (width <= maxDimension && height <= maxDimension && dataUrl.length < 140 * 1024) {
+          resolve(dataUrl);
+          return;
+        }
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      } catch (err) {
+        console.warn('PDF image optimization fallback:', err);
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 }
 
 export async function generateMaintenancePDF(
   report: MaintenanceReport,
-  settings: AppSettings
+  settings: AppSettings,
+  options?: PDFGenerationOptions
 ): Promise<PDFGenerationResult> {
+  const part: PDFReportPart = options?.part || 'all';
+  const totalPhotosInReport = report.photos.length;
+
+  // Determine photo subset based on part
+  let photosToRender: Array<{
+    id: string;
+    dataUrl: string;
+    caption: string;
+    tag?: string;
+    timestamp?: string;
+    originalIndex: number;
+  }> = [];
+
+  const splitIdx = Math.max(1, Math.ceil(totalPhotosInReport / 2));
+
+  if (part === 'part1') {
+    photosToRender = report.photos.slice(0, splitIdx).map((p, idx) => ({ ...p, originalIndex: idx }));
+  } else if (part === 'part2') {
+    photosToRender = report.photos.slice(splitIdx).map((p, idx) => ({ ...p, originalIndex: splitIdx + idx }));
+  } else {
+    photosToRender = report.photos.map((p, idx) => ({ ...p, originalIndex: idx }));
+  }
+
   // A4 dimensions in mm: 210 x 297
   const pdf = new jsPDF({
     orientation: 'portrait',
@@ -42,7 +135,6 @@ export async function generateMaintenancePDF(
   const lightBg = [248, 250, 252]; // #f8fafc
   const borderGray = [203, 213, 225]; // #cbd5e1
   const darkGold = [184, 134, 11]; // #b8860b Dourado Escuro
-  const softGold = [218, 165, 32]; // #daa520
 
   // Function to draw running header on pages 2+
   const drawRunningHeader = (pageNum: number) => {
@@ -54,13 +146,18 @@ export async function generateMaintenancePDF(
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.setTextColor(255, 255, 255);
-    pdf.text('RELATÓRIO TÉCNICO DE MANUTENÇÃO', margin + 4, 13.5);
+
+    let headerTitle = 'RELATÓRIO TÉCNICO DE MANUTENÇÃO';
+    if (part === 'part1') headerTitle = 'RELATÓRIO TÉCNICO [PARTE 1/2]';
+    if (part === 'part2') headerTitle = 'RELATÓRIO TÉCNICO [PARTE 2/2]';
+
+    pdf.text(headerTitle, margin + 4, 13.5);
     pdf.setFont('helvetica', 'normal');
     pdf.text(`TAG: ${report.tag || 'N/A'}  |  OS: ${report.os || 'N/A'}`, pageWidth - margin - 4, 13.5, { align: 'right' });
   };
 
   // Function to draw running footer
-  const drawFooter = (pageNum: number, totalPagesPlaceholder: boolean = false) => {
+  const drawFooter = (pageNum: number) => {
     const y = pageHeight - 9;
     pdf.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
     pdf.setLineWidth(0.3);
@@ -70,7 +167,8 @@ export async function generateMaintenancePDF(
     pdf.setFontSize(7.5);
     pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
     const now = new Date().toLocaleString('pt-BR');
-    pdf.text(`${settings.companyName || 'Relatório de Manutenção'} • Emitido em: ${now}`, margin, y + 2);
+    const partTag = part === 'part1' ? ' • Parte 1 de 2' : part === 'part2' ? ' • Parte 2 de 2' : '';
+    pdf.text(`${settings.companyName || 'Relatório de Manutenção'}${partTag} • Emitido em: ${now}`, margin, y + 2);
     // Page number
     pdf.text(`Página ${pageNum}`, pageWidth - margin, y + 2, { align: 'right' });
   };
@@ -86,14 +184,26 @@ export async function generateMaintenancePDF(
 
   // Title inside banner
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(14);
+  pdf.setFontSize(13);
   pdf.setTextColor(255, 255, 255);
-  pdf.text('RELATÓRIO TÉCNICO DE MANUTENÇÃO', margin + 6, margin + 11);
+
+  let bannerMainTitle = 'RELATÓRIO TÉCNICO DE MANUTENÇÃO';
+  let bannerSubTitle = 'INSPEÇÃO, DESMONTAGEM E ANÁLISE DE EQUIPAMENTOS';
+
+  if (part === 'part1') {
+    bannerMainTitle = 'RELATÓRIO TÉCNICO DE MANUTENÇÃO - PARTE 1 DE 2';
+    bannerSubTitle = `INSPEÇÃO INICIAL E REGISTROS FOTOGRÁFICOS (FOTOS 01 A ${photosToRender.length})`;
+  } else if (part === 'part2') {
+    bannerMainTitle = 'RELATÓRIO TÉCNICO DE MANUTENÇÃO - PARTE 2 DE 2';
+    bannerSubTitle = `REGISTROS COMPLEMENTARES E PLANILHAS TÉCNICAS (FOTOS ${splitIdx + 1} A ${totalPhotosInReport})`;
+  }
+
+  pdf.text(bannerMainTitle, margin + 6, margin + 10.5);
 
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(9);
+  pdf.setFontSize(8.5);
   pdf.setTextColor(254, 243, 199); // Soft amber/gold
-  pdf.text('INSPEÇÃO, DESMONTAGEM E ANÁLISE DE EQUIPAMENTOS', margin + 6, margin + 18);
+  pdf.text(bannerSubTitle, margin + 6, margin + 17.5);
 
   // Status Badge in Top Right
   const statusLabels: Record<string, string> = {
@@ -175,10 +285,18 @@ export async function generateMaintenancePDF(
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10.5);
   pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
-  pdf.text(`REGISTROS FOTOGRÁFICOS DE INSPEÇÃO (${report.photos.length} FOTOS)`, margin, currentY + 4);
+
+  let sectionTitle = `REGISTROS FOTOGRÁFICOS DE INSPEÇÃO (${photosToRender.length} FOTOS)`;
+  if (part === 'part1') {
+    sectionTitle = `REGISTROS FOTOGRÁFICOS - PARTE 1/2 (${photosToRender.length} de ${totalPhotosInReport} FOTOS)`;
+  } else if (part === 'part2') {
+    sectionTitle = `REGISTROS FOTOGRÁFICOS - PARTE 2/2 (${photosToRender.length} de ${totalPhotosInReport} FOTOS)`;
+  }
+
+  pdf.text(sectionTitle, margin, currentY + 4);
   pdf.setDrawColor(darkGold[0], darkGold[1], darkGold[2]);
   pdf.setLineWidth(0.6);
-  pdf.line(margin, currentY + 6, margin + 40, currentY + 6);
+  pdf.line(margin, currentY + 6, margin + 44, currentY + 6);
 
   currentY += 10;
 
@@ -186,9 +304,9 @@ export async function generateMaintenancePDF(
   let pageCount = 1;
   drawFooter(pageCount);
 
-  // Render high-res photos with automatic text wrapping in comments
-  for (let i = 0; i < report.photos.length; i++) {
-    const photo = report.photos[i];
+  // Render high-res photos with corporate compression and automatic text wrapping in comments
+  for (let i = 0; i < photosToRender.length; i++) {
+    const photo = photosToRender[i];
     pdf.addPage();
     pageCount++;
     drawRunningHeader(pageCount);
@@ -211,15 +329,25 @@ export async function generateMaintenancePDF(
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8.5);
     pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
-    pdf.text(`REGISTRO FOTOGRÁFICO #${String(i + 1).padStart(2, '0')}`, margin + 6, photoCardY + 6.5);
+    pdf.text(
+      `REGISTRO FOTOGRÁFICO #${String(photo.originalIndex + 1).padStart(2, '0')}`,
+      margin + 6,
+      photoCardY + 6.5
+    );
+
+    // Number indicator (e.g. "Foto 1 de 20")
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(slateGray[0], slateGray[1], slateGray[2]);
+    pdf.text(`(Item ${photo.originalIndex + 1} de ${totalPhotosInReport})`, margin + 54, photoCardY + 6.5);
 
     if (photo.tag) {
       pdf.setFillColor(darkGold[0], darkGold[1], darkGold[2]);
-      pdf.roundedRect(margin + 60, photoCardY + 2, 22, 6, 1, 1, 'F');
+      pdf.roundedRect(margin + 84, photoCardY + 2, 22, 6, 1, 1, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(6.5);
       pdf.setTextColor(255, 255, 255);
-      pdf.text(photo.tag.toUpperCase(), margin + 71, photoCardY + 6, { align: 'center' });
+      pdf.text(photo.tag.toUpperCase(), margin + 95, photoCardY + 6, { align: 'center' });
     }
 
     pdf.setFont('helvetica', 'normal');
@@ -241,7 +369,7 @@ export async function generateMaintenancePDF(
     const commentBoxH = Math.min(neededCommentH, 65); // Cap to preserve photo area
     const photoMaxH = availableHeight - 10 - commentBoxH - 8;
 
-    // Center the photo within the frame
+    // Center the photo within the frame with corporate compression (under 15 MB)
     try {
       const imgX = margin + 6;
       const imgY = photoCardY + 14;
@@ -250,8 +378,11 @@ export async function generateMaintenancePDF(
       pdf.setFillColor(230, 235, 240);
       pdf.rect(imgX, imgY, photoMaxW, photoMaxH, 'F');
 
+      // Compress photo dynamically for PDF embedding
+      const compressedDataUrl = await compressImageForPDF(photo.dataUrl, 1200, 0.72);
+
       pdf.addImage(
-        photo.dataUrl,
+        compressedDataUrl,
         'JPEG',
         imgX,
         imgY,
@@ -292,38 +423,40 @@ export async function generateMaintenancePDF(
   }
 
   // ---------------- TECHNICAL TABLES (FOLHA DE AJUSTES & PROCEDIMENTOS) ----------------
-  // If Adjustment Sheet is enabled or filled, render it at the end of the report
-  if (report.adjustmentSheet && (report.adjustmentSheet.enabled || hasAdjustmentSheetData(report.adjustmentSheet))) {
-    pageCount = renderAdjustmentSheetPDF(pdf, report.adjustmentSheet, report, drawRunningHeader, drawFooter);
-  }
+  // Tables are included in 'all' (complete) and 'part2' (second half), keeping 'part1' lightweight
+  if (part !== 'part1') {
+    // If Adjustment Sheet is enabled or filled, render it at the end of the report
+    if (report.adjustmentSheet && (report.adjustmentSheet.enabled || hasAdjustmentSheetData(report.adjustmentSheet))) {
+      pageCount = renderAdjustmentSheetPDF(pdf, report.adjustmentSheet, report, drawRunningHeader, drawFooter);
+    }
 
-  // If Procedure Redutores is enabled or filled
-  if (report.procedureRedutores && (report.procedureRedutores.enabled || hasProcedureSheetData(report.procedureRedutores))) {
-    pageCount = renderProcedureSheetPDF(pdf, report.procedureRedutores, report, drawRunningHeader, drawFooter);
-  }
+    // If Procedure Redutores is enabled or filled
+    if (report.procedureRedutores && (report.procedureRedutores.enabled || hasProcedureSheetData(report.procedureRedutores))) {
+      pageCount = renderProcedureSheetPDF(pdf, report.procedureRedutores, report, drawRunningHeader, drawFooter);
+    }
 
-  // If Procedure Bombas is enabled or filled
-  if (report.procedureBombas && (report.procedureBombas.enabled || hasProcedureSheetData(report.procedureBombas))) {
-    pageCount = renderProcedureSheetPDF(pdf, report.procedureBombas, report, drawRunningHeader, drawFooter);
-  }
+    // If Procedure Bombas is enabled or filled
+    if (report.procedureBombas && (report.procedureBombas.enabled || hasProcedureSheetData(report.procedureBombas))) {
+      pageCount = renderProcedureSheetPDF(pdf, report.procedureBombas, report, drawRunningHeader, drawFooter);
+    }
 
-  // If Procedure Mancais is enabled or filled
-  if (report.procedureMancais && (report.procedureMancais.enabled || hasProcedureSheetData(report.procedureMancais))) {
-    pageCount = renderProcedureSheetPDF(pdf, report.procedureMancais, report, drawRunningHeader, drawFooter);
-  }
+    // If Procedure Mancais is enabled or filled
+    if (report.procedureMancais && (report.procedureMancais.enabled || hasProcedureSheetData(report.procedureMancais))) {
+      pageCount = renderProcedureSheetPDF(pdf, report.procedureMancais, report, drawRunningHeader, drawFooter);
+    }
 
-  // If Parts Order Sheet is enabled or filled
-  if (report.partsOrderSheet && (report.partsOrderSheet.enabled || hasPartsOrderSheetData(report.partsOrderSheet))) {
-    pageCount = renderPartsOrderSheetPDF(pdf, report.partsOrderSheet, report, drawRunningHeader, drawFooter);
-  }
+    // If Parts Order Sheet is enabled or filled
+    if (report.partsOrderSheet && (report.partsOrderSheet.enabled || hasPartsOrderSheetData(report.partsOrderSheet))) {
+      pageCount = renderPartsOrderSheetPDF(pdf, report.partsOrderSheet, report, drawRunningHeader, drawFooter);
+    }
 
-  // If Electric Motor Sheet is enabled or filled
-  if (report.motorSheet && (report.motorSheet.enabled || hasMotorSheetData(report.motorSheet))) {
-    pageCount = renderMotorSheetPDF(pdf, report.motorSheet, report, drawRunningHeader, drawFooter);
+    // If Electric Motor Sheet is enabled or filled
+    if (report.motorSheet && (report.motorSheet.enabled || hasMotorSheetData(report.motorSheet))) {
+      pageCount = renderMotorSheetPDF(pdf, report.motorSheet, report, drawRunningHeader, drawFooter);
+    }
   }
 
   // ---------------- FINAL PAGE: TECHNICAL CONCLUSION (NO SIGNATURE BLOCK AS REQUESTED) ----------------
-  // User requested: "retire a parte de assinatura no final dos laudos"
   pdf.addPage();
   pageCount = pdf.getNumberOfPages();
   drawRunningHeader(pageCount);
@@ -337,7 +470,15 @@ export async function generateMaintenancePDF(
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(8.5);
   pdf.setTextColor(255, 255, 255);
-  pdf.text('CONCLUSÃO TÉCNICA E ENCERRAMENTO DO LAUDO', margin + 6, finalY + 6.5);
+
+  let conclusionHeaderTitle = 'CONCLUSÃO TÉCNICA E ENCERRAMENTO DO LAUDO';
+  if (part === 'part1') {
+    conclusionHeaderTitle = 'CONCLUSÃO DA PARTE 1 DE 2 - LAUDO DE MANUTENÇÃO';
+  } else if (part === 'part2') {
+    conclusionHeaderTitle = 'CONCLUSÃO DA PARTE 2 DE 2 E ENCERRAMENTO DO LAUDO';
+  }
+
+  pdf.text(conclusionHeaderTitle, margin + 6, finalY + 6.5);
 
   finalY += 18;
   pdf.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
@@ -347,13 +488,35 @@ export async function generateMaintenancePDF(
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8.5);
   pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
-  const conclusionText = [
-    `• O presente relatório técnico documenta as etapas de inspeção e intervenção realizadas no equipamento TAG ${report.tag || '---'}.`,
-    `• Todas as evidências fotográficas foram coletadas em campo com resolução máxima e inspecionadas conforme os padrões de manutenção.`,
-    `• Ordem de Serviço de referência: OS ${report.os || '---'}.`,
-    `• Recomenda-se o acompanhamento periódico dos itens apontados com anomalia nas fotos de inspeção.`,
-    `• Laudo técnico validado eletronicamente para fins de histórico e rastreabilidade de manutenção mecânica.`,
-  ];
+
+  let conclusionText: string[] = [];
+
+  if (part === 'part1') {
+    conclusionText = [
+      `• O presente documento constitui a PARTE 1 DE 2 do Laudo Técnico do equipamento TAG ${report.tag || '---'} (OS ${report.os || '---'}).`,
+      `• Foram incluídos nesta primeira parte os registros fotográficos iniciais (${photosToRender.length} de ${totalPhotosInReport} fotos) devidamente inspecionados.`,
+      `• Este arquivo foi otimizado e particionado para rigorosa conformidade com o limite corporativo de envio de e-mails (< 15 MB).`,
+      `• A PARTE 2 DE 2 contém os registros fotográficos complementares e as planilhas técnicas de ajustes dimensionais e procedimentos mecânicos.`,
+      `• Documento gerado eletronicamente pela equipe de Engenharia de Manutenção.`,
+    ];
+  } else if (part === 'part2') {
+    conclusionText = [
+      `• O presente documento constitui a PARTE 2 DE 2 do Laudo Técnico do equipamento TAG ${report.tag || '---'} (OS ${report.os || '---'}).`,
+      `• Inclui os registros fotográficos complementares (${photosToRender.length} fotos) e todas as planilhas técnicas de procedimentos e ajustes.`,
+      `• Ordem de Serviço de referência: OS ${report.os || '---'}.`,
+      `• Recomenda-se o arquivamento conjunto de ambas as partes (Parte 1 e Parte 2) no histórico do equipamento.`,
+      `• Laudo técnico integral validado eletronicamente para fins de histórico e rastreabilidade de manutenção mecânica.`,
+    ];
+  } else {
+    conclusionText = [
+      `• O presente relatório técnico documenta as etapas de inspeção e intervenção realizadas no equipamento TAG ${report.tag || '---'}.`,
+      `• Todas as evidências fotográficas foram coletadas em campo com resolução máxima e inspecionadas conforme os padrões de manutenção.`,
+      `• Ordem de Serviço de referência: OS ${report.os || '---'}.`,
+      `• Recomenda-se o acompanhamento periódico dos itens apontados com anomalia nas fotos de inspeção.`,
+      `• Laudo técnico validado eletronicamente para fins de histórico e rastreabilidade de manutenção mecânica.`,
+    ];
+  }
+
   let textY = finalY + 8;
   conclusionText.forEach((line) => {
     const wrappedLine = pdf.splitTextToSize(line, contentWidth - 14);
@@ -378,7 +541,7 @@ export async function generateMaintenancePDF(
   pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
   pdf.text(`Técnico Responsável: ${report.technician || 'Carlos A. Castro'}`, margin + 6, finalY + 13);
   pdf.text(`TAG: ${report.tag || '---'}  |  OS: ${report.os || '---'}  |  Data: ${report.startDate || '---'}`, margin + 6, finalY + 18.5);
-  pdf.text(`Documento emitido digitalmente pela equipe de Engenharia de Manutenção.`, margin + 6, finalY + 24);
+  pdf.text(`Documento emitido digitalmente pela equipe de Engenharia de Manutenção • Conforme política corporativa (< 15 MB).`, margin + 6, finalY + 24);
 
   drawFooter(pageCount);
 
@@ -396,14 +559,34 @@ export async function generateMaintenancePDF(
     pdf.text(`Página ${p} de ${totalPages}`, pageWidth - margin, footerY, { align: 'right' });
   }
 
-  const cleanFilename = `Relatorio_Tecnico_OS_${(report.os || 'GERAL').replace(/[^a-zA-Z0-9]/g, '_')}_TAG_${(report.tag || 'EQUIP').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  // Construct filename
+  const baseFilename = `Relatorio_Tecnico_OS_${(report.os || 'GERAL').replace(/[^a-zA-Z0-9]/g, '_')}_TAG_${(report.tag || 'EQUIP').replace(/[^a-zA-Z0-9]/g, '_')}`;
+  let cleanFilename = `${baseFilename}.pdf`;
+  if (part === 'part1') {
+    cleanFilename = `${baseFilename}_PARTE_1_de_2.pdf`;
+  } else if (part === 'part2') {
+    cleanFilename = `${baseFilename}_PARTE_2_de_2.pdf`;
+  }
+
   const blob = pdf.output('blob');
   const blobUrl = URL.createObjectURL(blob);
+  const sizeBytes = blob.size;
+  const sizeMB = parseFloat((sizeBytes / (1024 * 1024)).toFixed(2));
+  const sizeFormatted = sizeMB < 1 ? `${Math.round(sizeBytes / 1024)} KB` : `${sizeMB.toFixed(2)} MB`;
+  const isOverCorporateLimit = sizeMB >= 15;
 
   return {
     blob,
     blobUrl,
     filename: cleanFilename,
+    sizeBytes,
+    sizeMB,
+    sizeFormatted,
+    part,
+    totalPages,
+    photosCount: photosToRender.length,
+    totalPhotosInReport,
+    isOverCorporateLimit,
   };
 }
 
@@ -742,10 +925,21 @@ export async function generatePartsOrderPDF(
   const cleanFilename = `Pedido_Pecas_OS_${(osVal || 'GERAL').replace(/[^a-zA-Z0-9]/g, '_')}_TAG_${(tagVal || 'EQUIP').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   const blob = pdf.output('blob');
   const blobUrl = URL.createObjectURL(blob);
+  const sizeBytes = blob.size;
+  const sizeMB = parseFloat((sizeBytes / (1024 * 1024)).toFixed(2));
+  const sizeFormatted = sizeMB < 1 ? `${Math.round(sizeBytes / 1024)} KB` : `${sizeMB.toFixed(2)} MB`;
 
   return {
     blob,
     blobUrl,
     filename: cleanFilename,
+    sizeBytes,
+    sizeMB,
+    sizeFormatted,
+    part: 'all',
+    totalPages,
+    photosCount: 0,
+    totalPhotosInReport: 0,
+    isOverCorporateLimit: false,
   };
 }

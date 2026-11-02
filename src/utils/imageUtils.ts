@@ -140,17 +140,17 @@ export function readFileAsDataURL(file: File): Promise<string> {
         return;
       }
 
-      // Standardize industrial photos to max 1600x1600 px with 0.85 quality.
+      // Standardize industrial photos to max 1360x1360 px with 0.78 quality.
       // This preserves high-definition inspection clarity for gears, bearings, and tags,
-      // while keeping data size lightweight (~200KB-350KB per photo) to guarantee
-      // instantaneous saving to IndexedDB and zero crashes when charging or docking.
+      // while keeping data size lightweight (~100KB-160KB per photo) to guarantee
+      // instantaneous saving and stay well below the 15 MB corporate email limit.
       const img = new Image();
       img.onerror = () => {
         resolve(rawDataUrl);
       };
       img.onload = () => {
         try {
-          const maxDimension = 1600;
+          const maxDimension = 1360;
           let { width, height } = img;
 
           if (width > maxDimension || height > maxDimension) {
@@ -177,8 +177,8 @@ export function readFileAsDataURL(file: File): Promise<string> {
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Return crisp, optimized JPEG
-          const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          // Return crisp, optimized JPEG (corporate email compliant)
+          const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.78);
           resolve(optimizedDataUrl);
         } catch (e) {
           console.warn('Canvas optimization error, falling back to original:', e);

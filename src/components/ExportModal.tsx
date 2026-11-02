@@ -8,10 +8,18 @@ import {
   Copy, 
   Loader2,
   CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  ShieldCheck,
+  Layers,
   Send
 } from 'lucide-react';
 import { MaintenanceReport, AppSettings } from '../types';
-import { generateMaintenancePDF, PDFGenerationResult } from '../utils/pdfGenerator';
+import { 
+  generateMaintenancePDF, 
+  PDFGenerationResult, 
+  PDFReportPart 
+} from '../utils/pdfGenerator';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -42,36 +50,64 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   settings,
   onOpenSettings,
 }) => {
+  const [selectedPart, setSelectedPart] = useState<PDFReportPart>('all');
   const [isGenerating, setIsGenerating] = useState(false);
   const [pdfResult, setPdfResult] = useState<PDFGenerationResult | null>(null);
+  const [resultsCache, setResultsCache] = useState<Partial<Record<PDFReportPart, PDFGenerationResult>>>({});
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'success'>('idle');
   const [emailSentNotice, setEmailSentNotice] = useState(false);
 
+  const totalPhotos = report.photos.length;
+  const splitIdx = Math.max(1, Math.ceil(totalPhotos / 2));
+
+  // Reset or initialize modal
   useEffect(() => {
     if (isOpen) {
-      handleGenerate();
+      setSelectedPart('all');
+      setResultsCache({});
+      generateForPart('all');
     } else {
+      // Cleanup object URLs
+      (Object.values(resultsCache) as Array<PDFGenerationResult | undefined>).forEach((res) => {
+        if (res?.blobUrl) {
+          URL.revokeObjectURL(res.blobUrl);
+        }
+      });
       if (pdfResult?.blobUrl) {
         URL.revokeObjectURL(pdfResult.blobUrl);
       }
       setPdfResult(null);
+      setResultsCache({});
       setCopiedSummary(false);
       setDownloadStatus('idle');
       setEmailSentNotice(false);
     }
   }, [isOpen]);
 
-  const handleGenerate = async () => {
+  const generateForPart = async (part: PDFReportPart) => {
+    // Check if in cache
+    if (resultsCache[part]) {
+      setPdfResult(resultsCache[part]!);
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      const result = await generateMaintenancePDF(report, settings);
+      const result = await generateMaintenancePDF(report, settings, { part });
       setPdfResult(result);
+      setResultsCache((prev) => ({ ...prev, [part]: result }));
     } catch (err) {
-      console.error('Error generating PDF:', err);
+      console.error('Error generating PDF for part:', part, err);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleSelectPart = (part: PDFReportPart) => {
+    if (part === selectedPart && pdfResult) return;
+    setSelectedPart(part);
+    generateForPart(part);
   };
 
   // Robust PDF Download handler that works reliably in Android WebView, Chrome, and desktop
@@ -129,10 +165,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     }
   };
 
+  const getPartLabel = (part: PDFReportPart) => {
+    if (part === 'part1') return 'PARTE 1 DE 2 (Fotos Iniciais)';
+    if (part === 'part2') return 'PARTE 2 DE 2 (Fotos Finais + Planilhas Técnicas)';
+    return 'VOLUME COMPLETO (Laudo Integral)';
+  };
+
   const constructEmailBody = () => {
+    const partInfo = getPartLabel(selectedPart);
+
     return `Prezados,
 
-Segue o Relatório Técnico de Manutenção do equipamento abaixo:
+Segue o Relatório Técnico de Manutenção do equipamento abaixo (${partInfo}):
 
 ==================================================
 RELATÓRIO TÉCNICO DE MANUTENÇÃO - KINROSS
@@ -140,12 +184,14 @@ RELATÓRIO TÉCNICO DE MANUTENÇÃO - KINROSS
 • TAG do Equipamento: ${report.tag || 'N/A'}
 • Ordem de Serviço (OS): ${report.os || 'N/A'}
 • Equipamento / Título: ${report.title || 'Manutenção Geral'}
+• Volume / Divisão: ${partInfo}
 • Data de Início: ${report.startDate || 'N/A'}
 • Data de Término: ${report.endDate || 'N/A'}
 • Setor / Local: ${report.location || 'Oficina de Manutenção'}
 • Técnico Responsável: ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}
 • Status: ${report.status}
-• Total de Registros Fotográficos: ${report.photos.length} fotos registradas
+• Total de Registros no Arquivo: ${pdfResult ? pdfResult.photosCount : report.photos.length} fotos incluídas (de ${totalPhotos} fotos totais)
+• Tamanho do Anexo PDF: ${pdfResult?.sizeFormatted || 'Otimizado'} (Conforme política corporativa < 15 MB)
 
 --------------------------------------------------
 COMENTÁRIO GERAL & DIAGNÓSTICO:
@@ -153,8 +199,10 @@ COMENTÁRIO GERAL & DIAGNÓSTICO:
 ${report.generalComment || 'Desmontagem, limpeza, inspeção dimensional e serviços concluídos conforme procedimento técnico.'}
 
 --------------------------------------------------
-Arquivo gerado: ${pdfResult?.filename || 'Relatorio_Tecnico.pdf'}
-O laudo completo em alta resolução foi gerado e salvo.
+ARQUIVO ANEXADO:
+${pdfResult?.filename || 'Relatorio_Tecnico.pdf'}
+${selectedPart === 'part1' ? 'OBS: As fotos complementares e as folhas técnicas detalhadas estão sendo encaminhadas na PARTE 2.' : ''}
+${selectedPart === 'part2' ? 'OBS: Contém os registros complementares, folhas de ajustes, procedimentos e ordens de peças.' : ''}
 
 Atenciosamente,
 ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
@@ -164,7 +212,11 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
   const handleSendViaGmail = async () => {
     if (!pdfResult) return;
 
-    const emailSubject = `[Relatório Técnico Kinross] TAG: ${report.tag || 'N/A'} • OS: ${report.os || 'N/A'} - Manutenção de Equipamentos`;
+    let partPrefix = '';
+    if (selectedPart === 'part1') partPrefix = '[PARTE 1/2] ';
+    if (selectedPart === 'part2') partPrefix = '[PARTE 2/2] ';
+
+    const emailSubject = `${partPrefix}[Relatório Técnico Kinross] TAG: ${report.tag || 'N/A'} • OS: ${report.os || 'N/A'} - Manutenção de Equipamentos`;
     const emailBody = constructEmailBody();
 
     // Default fixed recipient is paulo.sousa@kinross.com
@@ -247,37 +299,156 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Relatório Técnico Pronto
+                Exportação do Relatório Técnico
               </h3>
               <p className="text-xs text-slate-600">
-                Documento técnico formatado com {report.photos.length} fotos em alta definição.
+                Otimizado para o limite de e-mail corporativo (<span className="font-semibold text-slate-800">máx. 15 MB</span>).
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 sm:p-6 space-y-5 bg-white">
+        <div className="p-5 sm:p-6 space-y-4 bg-white">
+          {/* Part Selection Tabs (Volume Completo vs 2 Partes) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-amber-600" />
+                Selecione o modo de envio por e-mail:
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Total de fotos: {totalPhotos}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+              {/* Option 1: Volume Completo */}
+              <button
+                type="button"
+                onClick={() => handleSelectPart('all')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 cursor-pointer text-center ${
+                  selectedPart === 'all'
+                    ? 'bg-white text-slate-900 shadow-sm border border-slate-300'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <span>Volume Completo</span>
+                <span className="text-[10px] font-normal text-slate-500">
+                  {totalPhotos} fotos + tabelas
+                </span>
+              </button>
+
+              {/* Option 2: Parte 1 de 2 */}
+              <button
+                type="button"
+                onClick={() => handleSelectPart('part1')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 cursor-pointer text-center ${
+                  selectedPart === 'part1'
+                    ? 'bg-white text-amber-900 shadow-sm border border-amber-400'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  Parte 1 de 2
+                </span>
+                <span className="text-[10px] font-normal text-slate-500">
+                  Fotos 01 a {splitIdx}
+                </span>
+              </button>
+
+              {/* Option 3: Parte 2 de 2 */}
+              <button
+                type="button"
+                onClick={() => handleSelectPart('part2')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 cursor-pointer text-center ${
+                  selectedPart === 'part2'
+                    ? 'bg-white text-amber-900 shadow-sm border border-amber-400'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  Parte 2 de 2
+                </span>
+                <span className="text-[10px] font-normal text-slate-500">
+                  {totalPhotos > splitIdx ? `Fotos ${splitIdx + 1} a ${totalPhotos}` : 'Folhas técnicas'}
+                </span>
+              </button>
+            </div>
+          </div>
+
           {isGenerating ? (
-            <div className="py-16 flex flex-col items-center justify-center text-center">
+            <div className="py-14 flex flex-col items-center justify-center text-center">
               <div className="w-12 h-12 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
               <h4 className="text-sm font-bold text-slate-900">
-                Renderizando PDF Profissional...
+                Comprimindo e Renderizando PDF Profissional...
               </h4>
               <p className="text-xs text-slate-600 mt-1 max-w-sm">
-                Organizando cabeçalhos, metadados, molduras de alta resolução e comentários técnicos.
+                Processando compressão HD para conformidade com o limite de 15 MB do e-mail corporativo.
               </p>
             </div>
           ) : (
             <>
+              {/* Corporate Email Compliance Banner */}
+              {pdfResult && (
+                <div className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+                  pdfResult.sizeMB < 12
+                    ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950'
+                    : pdfResult.sizeMB < 15
+                    ? 'bg-amber-50/80 border-amber-300 text-amber-950'
+                    : 'bg-rose-50/80 border-rose-300 text-rose-950'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    {pdfResult.sizeMB < 12 ? (
+                      <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                    ) : pdfResult.sizeMB < 15 ? (
+                      <div className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                    ) : (
+                      <div className="p-1.5 rounded-lg bg-rose-100 text-rose-700">
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                    )}
+                    <div>
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>Tamanho do PDF: {pdfResult.sizeFormatted}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-white/70 rounded border border-current">
+                          {pdfResult.sizeMB < 15 ? '✓ Abaixo de 15 MB' : '⚠️ Acima de 15 MB'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] opacity-85 mt-0.5">
+                        {pdfResult.sizeMB < 12
+                          ? 'Aprovado para envio direto via e-mail corporativo sem risco de bloqueio.'
+                          : pdfResult.sizeMB < 15
+                          ? 'Próximo do limite de 15 MB. O envio em 2 partes garante 100% de entrega.'
+                          : 'Excede 15 MB na rede corporativa. Alterne para a Parte 1 e depois a Parte 2.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {pdfResult.sizeMB >= 12 && selectedPart === 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPart('part1')}
+                      className="shrink-0 px-2.5 py-1 rounded-xl bg-white border border-amber-300 text-amber-900 font-bold text-[11px] hover:bg-amber-50 transition cursor-pointer"
+                    >
+                      Usar 2 partes
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Document Overview Card */}
-              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
@@ -287,17 +458,22 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                     <span className="text-xs font-mono font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded">
                       OS: {report.os || 'N/A'}
                     </span>
+                    {selectedPart !== 'all' && (
+                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded uppercase">
+                        {selectedPart === 'part1' ? 'Parte 1/2' : 'Parte 2/2'}
+                      </span>
+                    )}
                   </div>
-                  <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate max-w-md">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-md font-mono">
                     {pdfResult?.filename || 'Relatorio_Tecnico.pdf'}
                   </h4>
                   <p className="text-xs text-slate-600">
-                    Formato A4 • {report.photos.length} {report.photos.length === 1 ? 'foto registrada' : 'fotos registradas'} com comentários
+                    Formato A4 • {pdfResult?.photosCount || 0} fotos nesta parte ({pdfResult?.totalPages || 1} páginas totais)
                   </p>
                 </div>
 
                 {/* Destination email display */}
-                <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 text-left sm:text-right w-full sm:w-auto shadow-xs">
+                <div className="bg-white px-3 py-2 rounded-xl border border-slate-200 text-left sm:text-right w-full sm:w-auto shadow-xs">
                   <div className="text-[10px] uppercase font-semibold text-slate-600 flex items-center sm:justify-end gap-1">
                     <Mail className="w-3 h-3 text-amber-600" />
                     Destinatário Oficial:
@@ -309,7 +485,7 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                   </div>
                   <button
                     onClick={onOpenSettings}
-                    className="text-[10px] text-slate-600 hover:text-amber-700 font-medium underline transition mt-1 block sm:inline cursor-pointer"
+                    className="text-[10px] text-slate-600 hover:text-amber-700 font-medium underline transition mt-0.5 block sm:inline cursor-pointer"
                   >
                     Alterar destinatário
                   </button>
@@ -318,23 +494,27 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
 
               {/* Status Notice when email is opened */}
               {emailSentNotice && (
-                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs flex items-center gap-2.5 animate-fadeIn">
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs flex items-center gap-2.5 animate-fadeIn">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>O aplicativo Gmail foi aberto com o destinatário e o texto completo do laudo preenchidos!</span>
+                  <span>
+                    Aplicativo Gmail preparado com {selectedPart === 'all' ? 'o Volume Completo' : selectedPart === 'part1' ? 'a Parte 1 de 2' : 'a Parte 2 de 2'}!
+                  </span>
                 </div>
               )}
 
               {/* Main Action Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 {/* Send via Gmail Button (Primary) */}
                 <button
                   type="button"
                   id="btn-send-gmail"
                   onClick={handleSendViaGmail}
-                  className="py-4 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-red-500 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white font-bold text-sm shadow-lg shadow-red-500/25 transition flex items-center justify-center gap-2.5 group cursor-pointer"
+                  className="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-red-500 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white font-bold text-sm shadow-lg shadow-red-500/25 transition flex items-center justify-center gap-2 group cursor-pointer"
                 >
                   <Mail className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  <span>Enviar Laudo via Gmail</span>
+                  <span>
+                    {selectedPart === 'part1' ? 'Enviar Parte 1 via Gmail' : selectedPart === 'part2' ? 'Enviar Parte 2 via Gmail' : 'Enviar Laudo via Gmail'}
+                  </span>
                 </button>
 
                 {/* Download PDF Button */}
@@ -343,7 +523,7 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                   id="btn-download-pdf"
                   onClick={handleDownloadPDF}
                   disabled={downloadStatus === 'downloading'}
-                  className={`py-4 px-4 rounded-2xl font-bold text-sm shadow-lg active:scale-95 transition flex items-center justify-center gap-2.5 cursor-pointer ${
+                  className={`py-3.5 px-4 rounded-2xl font-bold text-sm shadow-lg active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer ${
                     downloadStatus === 'success'
                       ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
                       : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20'
@@ -362,14 +542,26 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                   ) : (
                     <>
                       <Download className="w-5 h-5" />
-                      <span>Baixar Arquivo PDF</span>
+                      <span>
+                        {selectedPart === 'part1' ? 'Baixar PDF Parte 1' : selectedPart === 'part2' ? 'Baixar PDF Parte 2' : 'Baixar Arquivo PDF'}
+                      </span>
                     </>
                   )}
                 </button>
               </div>
 
+              {/* Informative corporate guidance for 2-parts sending */}
+              {totalPhotos > 10 && (
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <span>
+                    <strong>Dica Corporativa:</strong> Se o relatório tiver mais de 15 fotos ou o e-mail for rejeitado pelo servidor da empresa, envie primeiro a <strong>Parte 1</strong> e depois a <strong>Parte 2</strong>. Ambas mantêm numeração e fotos contínuas em alta resolução.
+                  </span>
+                </div>
+              )}
+
               {/* Auxiliary Actions */}
-              <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-xs">
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
                 <button
                   type="button"
                   onClick={copySummaryText}
@@ -389,7 +581,7 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                 </button>
 
                 <span className="text-[11px] text-slate-500 font-semibold">
-                  Tablet & Celular Android
+                  Tablet & Celular Android • Limite &lt; 15 MB
                 </span>
               </div>
             </>
