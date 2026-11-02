@@ -48,19 +48,20 @@ export const PartsOrderModal: React.FC<PartsOrderModalProps> = ({
   appSettings,
   onUpdateAppSettings,
 }) => {
+  const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
   // Load globally fixed recipient emails so they are permanent across all tabs and future sessions
   const [fixedEmails, setFixedEmails] = useState<string[]>(() => {
     const loaded = loadFixedPartsOrderEmails();
-    if (loaded && loaded.length > 0) return loaded;
+    if (loaded && loaded.length > 0) return Array.from(new Set([...loaded, ...defaultKinrossEmails]));
     if (appSettings?.recipientEmails && appSettings.recipientEmails.length > 0) {
-      return appSettings.recipientEmails;
+      return Array.from(new Set([...appSettings.recipientEmails, ...defaultKinrossEmails]));
     }
-    return [fixedEmail || 'paulo.sousa@kinross.com'];
+    return defaultKinrossEmails;
   });
 
   const currentRecipients = fixedEmails.length > 0
     ? fixedEmails
-    : [fixedEmail || 'paulo.sousa@kinross.com'];
+    : defaultKinrossEmails;
 
   const [formData, setFormData] = useState<PartsOrderSheet>(() => {
     return {
@@ -566,10 +567,12 @@ Oficina Central de Manutenção - Kinross Brasil Mineração`;
                   <span>Nenhum destinatário fixado no aplicativo.</span>
                   <button
                     type="button"
-                    onClick={() => handleAddRecipientEmail(fixedEmail || 'paulo.sousa@kinross.com')}
-                    className="text-amber-700 hover:underline font-bold"
+                    onClick={() => {
+                      defaultKinrossEmails.forEach((email) => handleAddRecipientEmail(email));
+                    }}
+                    className="text-amber-700 hover:underline font-bold cursor-pointer"
                   >
-                    Restaurar {fixedEmail || 'paulo.sousa@kinross.com'}
+                    Restaurar destinatários Kinross
                   </button>
                 </div>
               )}

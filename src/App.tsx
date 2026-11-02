@@ -32,15 +32,25 @@ const STORAGE_KEY_SETTINGS = 'ais_maintenance_settings_v2';
 export default function App() {
   // Load initial settings with fallback
   const [settings, setSettings] = useState<AppSettings>(() => {
+    const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const existingEmails = Array.isArray(parsed.recipientEmails) ? parsed.recipientEmails : [];
+        const mergedEmails = Array.from(new Set([...existingEmails, ...defaultKinrossEmails]));
+        return {
+          ...parsed,
+          recipientEmails: mergedEmails,
+          preconfiguredEmail: mergedEmails.join(', '),
+        };
+      }
     } catch (e) {
       console.error('Error loading settings from localStorage', e);
     }
     return {
-      preconfiguredEmail: 'paulo.sousa@kinross.com',
-      recipientEmails: ['paulo.sousa@kinross.com'],
+      preconfiguredEmail: defaultKinrossEmails.join(', '),
+      recipientEmails: defaultKinrossEmails,
       technicianDefaultName: 'Carlos A. Castro',
       companyName: 'Engenharia de Manutenção Industrial',
       photosPerPage: 1,

@@ -17,17 +17,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   // Initialize email list from recipientEmails or preconfiguredEmail
   const [emails, setEmails] = useState<string[]>(() => {
+    const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
     if (settings.recipientEmails && settings.recipientEmails.length > 0) {
-      return settings.recipientEmails;
+      return Array.from(new Set([...settings.recipientEmails, ...defaultKinrossEmails]));
     }
     if (settings.preconfiguredEmail) {
       const parsed = settings.preconfiguredEmail
         .split(/[,;]/)
         .map((e) => e.trim())
         .filter(Boolean);
-      if (parsed.length > 0) return parsed;
+      if (parsed.length > 0) return Array.from(new Set([...parsed, ...defaultKinrossEmails]));
     }
-    return ['paulo.sousa@kinross.com'];
+    return defaultKinrossEmails;
   });
 
   const [newEmailInput, setNewEmailInput] = useState('');
@@ -108,7 +109,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleResetDefaults = () => {
-    setEmails(['c.a.castro895@gmail.com']);
+    setEmails(['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com']);
     setNewEmailInput('');
     setEmailInputError('');
     setTechName('Carlos A. Castro');

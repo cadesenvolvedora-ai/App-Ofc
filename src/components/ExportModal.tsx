@@ -171,6 +171,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return 'VOLUME COMPLETO (Laudo Integral)';
   };
 
+  const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
+  const recipientsList = (settings.recipientEmails && settings.recipientEmails.length > 0)
+    ? Array.from(new Set([...settings.recipientEmails, ...defaultKinrossEmails]))
+    : (settings.preconfiguredEmail ? Array.from(new Set([...settings.preconfiguredEmail.split(/[,;]/).map(e => e.trim()).filter(Boolean), ...defaultKinrossEmails])) : defaultKinrossEmails);
+
   const constructEmailBody = () => {
     const partInfo = getPartLabel(selectedPart);
 
@@ -191,7 +196,7 @@ RELATÓRIO TÉCNICO DE MANUTENÇÃO - KINROSS
 • Técnico Responsável: ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}
 • Status: ${report.status}
 • Total de Registros no Arquivo: ${pdfResult ? pdfResult.photosCount : report.photos.length} fotos incluídas (de ${totalPhotos} fotos totais)
-• Tamanho do Anexo PDF: ${pdfResult?.sizeFormatted || 'Otimizado'} (Conforme política corporativa < 15 MB)
+• Tamanho do Anexo PDF: ${pdfResult?.sizeFormatted || 'Otimizado'}
 
 --------------------------------------------------
 COMENTÁRIO GERAL & DIAGNÓSTICO:
@@ -219,11 +224,7 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
     const emailSubject = `${partPrefix}[Relatório Técnico Kinross] TAG: ${report.tag || 'N/A'} • OS: ${report.os || 'N/A'} - Manutenção de Equipamentos`;
     const emailBody = constructEmailBody();
 
-    // Default fixed recipient is paulo.sousa@kinross.com
-    const recipientList = (settings.recipientEmails && settings.recipientEmails.length > 0)
-      ? settings.recipientEmails
-      : (settings.preconfiguredEmail ? settings.preconfiguredEmail.split(/[,;]/).map(e => e.trim()).filter(Boolean) : ['paulo.sousa@kinross.com']);
-    const recipientsString = recipientList.join(', ');
+    const recipientsString = recipientsList.join(', ');
 
     // 1. Save/download the PDF to device storage
     handleDownloadPDF();
@@ -476,18 +477,19 @@ ${report.technician || settings.technicianDefaultName || 'Carlos A. Castro'}`;
                 <div className="bg-white px-3 py-2 rounded-xl border border-slate-200 text-left sm:text-right w-full sm:w-auto shadow-xs">
                   <div className="text-[10px] uppercase font-semibold text-slate-600 flex items-center sm:justify-end gap-1">
                     <Mail className="w-3 h-3 text-amber-600" />
-                    Destinatário Oficial:
+                    Destinatários Oficiais ({recipientsList.length}):
                   </div>
-                  <div className="text-xs font-bold text-amber-900 truncate max-w-[240px] font-mono mt-0.5">
-                    {(settings.recipientEmails && settings.recipientEmails.length > 0)
-                      ? settings.recipientEmails.join(', ')
-                      : (settings.preconfiguredEmail || 'paulo.sousa@kinross.com')}
+                  <div 
+                    className="text-xs font-bold text-amber-900 truncate max-w-[280px] font-mono mt-0.5 cursor-help"
+                    title={recipientsList.join(', ')}
+                  >
+                    {recipientsList.join(', ')}
                   </div>
                   <button
                     onClick={onOpenSettings}
                     className="text-[10px] text-slate-600 hover:text-amber-700 font-medium underline transition mt-0.5 block sm:inline cursor-pointer"
                   >
-                    Alterar destinatário
+                    Gerenciar destinatários
                   </button>
                 </div>
               </div>

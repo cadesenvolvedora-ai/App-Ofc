@@ -367,7 +367,7 @@ export function createDefaultPartsOrderSheet(tag: string = '', os: string = '', 
     os: os || '',
     area: '',
     items: initialItems,
-    recipientEmails: ['paulo.sousa@kinross.com'],
+    recipientEmails: ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'],
   };
 }
 

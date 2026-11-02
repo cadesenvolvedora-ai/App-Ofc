@@ -34,11 +34,22 @@ export interface PDFGenerationResult {
   isOverCorporateLimit: boolean;
 }
 
+export interface CompressedImageInfo {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
 // Compress and resize image specifically before jsPDF embedding to guarantee lightweight PDFs under corporate 15 MB limits
-export function compressImageForPDF(dataUrl: string, maxDimension = 1200, quality = 0.72): Promise<string> {
+// Returns dataUrl and natural aspect-ratio dimensions to prevent any horizontal flattening/stretching
+export function compressImageForPDF(
+  dataUrl: string, 
+  maxDimension = 1200, 
+  quality = 0.72
+): Promise<CompressedImageInfo> {
   return new Promise((resolve) => {
     if (!dataUrl || !dataUrl.startsWith('data:image')) {
-      resolve(dataUrl);
+      resolve({ dataUrl, width: 800, height: 600 });
       return;
     }
 
@@ -46,12 +57,17 @@ export function compressImageForPDF(dataUrl: string, maxDimension = 1200, qualit
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
-        let { width, height } = img;
-        // If image is already smaller than maxDimension and lightweight, pass through
-        if (width <= maxDimension && height <= maxDimension && dataUrl.length < 140 * 1024) {
-          resolve(dataUrl);
+        let naturalW = img.naturalWidth || img.width || 800;
+        let naturalH = img.naturalHeight || img.height || 600;
+
+        // If image is already smaller than maxDimension and lightweight, pass through with original dims
+        if (naturalW <= maxDimension && naturalH <= maxDimension && dataUrl.length < 140 * 1024) {
+          resolve({ dataUrl, width: naturalW, height: naturalH });
           return;
         }
+
+        let width = naturalW;
+        let height = naturalH;
 
         if (width > maxDimension || height > maxDimension) {
           if (width > height) {
@@ -68,7 +84,7 @@ export function compressImageForPDF(dataUrl: string, maxDimension = 1200, qualit
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve(dataUrl);
+          resolve({ dataUrl, width: naturalW, height: naturalH });
           return;
         }
 
@@ -77,16 +93,17 @@ export function compressImageForPDF(dataUrl: string, maxDimension = 1200, qualit
         ctx.drawImage(img, 0, 0, width, height);
 
         const compressed = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressed);
+        resolve({ dataUrl: compressed, width, height });
       } catch (err) {
         console.warn('PDF image optimization fallback:', err);
-        resolve(dataUrl);
+        resolve({ dataUrl, width: img.naturalWidth || 800, height: img.naturalHeight || 600 });
       }
     };
-    img.onerror = () => resolve(dataUrl);
+    img.onerror = () => resolve({ dataUrl, width: 800, height: 600 });
     img.src = dataUrl;
   });
 }
+
 
 export async function generateMaintenancePDF(
   report: MaintenanceReport,
@@ -370,30 +387,57 @@ export async function generateMaintenancePDF(
     const photoMaxH = availableHeight - 10 - commentBoxH - 8;
 
     // Center the photo within the frame with corporate compression (under 15 MB)
+    // preserving its exact natural aspect ratio without horizontal/vertical distortion
     try {
       const imgX = margin + 6;
       const imgY = photoCardY + 14;
 
-      // Draw photo inner background/border
-      pdf.setFillColor(230, 235, 240);
+      // Draw photo container background
+      pdf.setFillColor(245, 247, 250);
       pdf.rect(imgX, imgY, photoMaxW, photoMaxH, 'F');
 
-      // Compress photo dynamically for PDF embedding
-      const compressedDataUrl = await compressImageForPDF(photo.dataUrl, 1200, 0.72);
+      // Compress photo dynamically for PDF embedding and retrieve actual dimensions
+      const { dataUrl: compressedDataUrl, width: imgW, height: imgH } = await compressImageForPDF(photo.dataUrl, 1200, 0.72);
+
+      // Calculate strictly proportional width and height (preserves original shape)
+      const imgAspect = (imgW > 0 && imgH > 0) ? (imgW / imgH) : (photoMaxW / photoMaxH);
+      const containerAspect = photoMaxW / photoMaxH;
+
+      let renderW = photoMaxW;
+      let renderH = photoMaxH;
+
+      if (imgAspect > containerAspect) {
+        // Photo is wider than container: fit to width, scale height proportionally
+        renderW = photoMaxW;
+        renderH = photoMaxW / imgAspect;
+      } else {
+        // Photo is taller than container: fit to height, scale width proportionally
+        renderH = photoMaxH;
+        renderW = photoMaxH * imgAspect;
+      }
+
+      // Center the photo within the container frame
+      const renderX = imgX + (photoMaxW - renderW) / 2;
+      const renderY = imgY + (photoMaxH - renderH) / 2;
 
       pdf.addImage(
         compressedDataUrl,
         'JPEG',
-        imgX,
-        imgY,
-        photoMaxW,
-        photoMaxH,
+        renderX,
+        renderY,
+        renderW,
+        renderH,
         undefined,
         'FAST'
       );
       
-      // Thin crisp photo border
+      // Thin crisp photo border around actual image
       pdf.setDrawColor(180, 195, 210);
+      pdf.setLineWidth(0.3);
+      pdf.rect(renderX, renderY, renderW, renderH, 'D');
+
+      // Frame container outer border
+      pdf.setDrawColor(226, 232, 240);
       pdf.setLineWidth(0.3);
       pdf.rect(imgX, imgY, photoMaxW, photoMaxH, 'D');
     } catch (err) {
@@ -529,7 +573,7 @@ export async function generateMaintenancePDF(
   pdf.setFillColor(241, 245, 249);
   pdf.setDrawColor(darkGold[0], darkGold[1], darkGold[2]);
   pdf.setLineWidth(0.6);
-  pdf.roundedRect(margin, finalY, contentWidth, 26, 2, 2, 'FD');
+  pdf.roundedRect(margin, finalY, contentWidth, 20, 2, 2, 'FD');
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(8);
@@ -539,9 +583,8 @@ export async function generateMaintenancePDF(
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8);
   pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
-  pdf.text(`Técnico Responsável: ${report.technician || 'Carlos A. Castro'}`, margin + 6, finalY + 13);
-  pdf.text(`TAG: ${report.tag || '---'}  |  OS: ${report.os || '---'}  |  Data: ${report.startDate || '---'}`, margin + 6, finalY + 18.5);
-  pdf.text(`Documento emitido digitalmente pela equipe de Engenharia de Manutenção • Conforme política corporativa (< 15 MB).`, margin + 6, finalY + 24);
+  pdf.text(`Técnico Responsável: ${report.technician || 'Carlos A. Castro'}`, margin + 6, finalY + 12.5);
+  pdf.text(`TAG: ${report.tag || '---'}  |  OS: ${report.os || '---'}  |  Data: ${report.startDate || '---'}`, margin + 6, finalY + 17);
 
   drawFooter(pageCount);
 
@@ -896,9 +939,10 @@ export async function generatePartsOrderPDF(
   pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
   pdf.text(`Total de Itens Requisitados: ${validItems.length} item(ns) cadastrados`, margin + 4, currentY + 11.5);
   
+  const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
   const recipientsText = (sheet.recipientEmails && sheet.recipientEmails.length > 0)
     ? sheet.recipientEmails.join(', ')
-    : 'paulo.sousa@kinross.com';
+    : defaultKinrossEmails.join(', ');
   const wrappedRecipients = pdf.splitTextToSize(`Destinatários do E-mail: ${recipientsText}`, contentWidth - 8);
   pdf.text(wrappedRecipients, margin + 4, currentY + 16.5);
 
