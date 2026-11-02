@@ -939,10 +939,13 @@ export async function generatePartsOrderPDF(
   pdf.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
   pdf.text(`Total de Itens Requisitados: ${validItems.length} item(ns) cadastrados`, margin + 4, currentY + 11.5);
   
-  const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
-  const recipientsText = (sheet.recipientEmails && sheet.recipientEmails.length > 0)
-    ? sheet.recipientEmails.join(', ')
-    : defaultKinrossEmails.join(', ');
+  const defaultPartsOrderEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com'];
+  const filteredRecipients = sheet.recipientEmails?.filter(
+    (e) => e.toLowerCase().trim() !== 'joaovictor.rocha@kinross.com'
+  );
+  const recipientsText = (filteredRecipients && filteredRecipients.length > 0)
+    ? filteredRecipients.join(', ')
+    : defaultPartsOrderEmails.join(', ');
   const wrappedRecipients = pdf.splitTextToSize(`Destinatários do E-mail: ${recipientsText}`, contentWidth - 8);
   pdf.text(wrappedRecipients, margin + 4, currentY + 16.5);
 

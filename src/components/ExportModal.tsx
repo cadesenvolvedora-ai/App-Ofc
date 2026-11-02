@@ -110,7 +110,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     generateForPart(part);
   };
 
-  // Robust PDF Download handler that works reliably in Android WebView, Chrome, and desktop
+  // Robust PDF Download handler - single clean download
   const handleDownloadPDF = async () => {
     if (!pdfResult) return;
     setDownloadStatus('downloading');
@@ -125,10 +125,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         return;
       }
 
-      // 2. Primary Web Download using standard Blob link
+      // 2. Web Download: trigger exactly one download using the Blob URL
       const a = document.createElement('a');
       a.href = pdfResult.blobUrl;
       a.download = pdfResult.filename;
+      a.rel = 'noopener noreferrer';
       a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
@@ -136,26 +137,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         if (document.body.contains(a)) {
           document.body.removeChild(a);
         }
-      }, 300);
-
-      // 3. Fallback Data URI for Android WebViews that do not trigger blob downloads
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string' && reader.result.startsWith('data:')) {
-          const fallbackLink = document.createElement('a');
-          fallbackLink.href = reader.result;
-          fallbackLink.download = pdfResult.filename;
-          fallbackLink.style.display = 'none';
-          document.body.appendChild(fallbackLink);
-          fallbackLink.click();
-          setTimeout(() => {
-            if (document.body.contains(fallbackLink)) {
-              document.body.removeChild(fallbackLink);
-            }
-          }, 300);
-        }
-      };
-      reader.readAsDataURL(pdfResult.blob);
+      }, 500);
 
       setDownloadStatus('success');
       setTimeout(() => setDownloadStatus('idle'), 3500);

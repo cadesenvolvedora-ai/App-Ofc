@@ -48,28 +48,36 @@ export const PartsOrderModal: React.FC<PartsOrderModalProps> = ({
   appSettings,
   onUpdateAppSettings,
 }) => {
-  const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
+  // Specifically for Parts Order Sheet: paulo.sousa and vitor.alves (excluding joaovictor.rocha)
+  const defaultPartsOrderEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com'];
   // Load globally fixed recipient emails so they are permanent across all tabs and future sessions
   const [fixedEmails, setFixedEmails] = useState<string[]>(() => {
     const loaded = loadFixedPartsOrderEmails();
-    if (loaded && loaded.length > 0) return Array.from(new Set([...loaded, ...defaultKinrossEmails]));
-    if (appSettings?.recipientEmails && appSettings.recipientEmails.length > 0) {
-      return Array.from(new Set([...appSettings.recipientEmails, ...defaultKinrossEmails]));
+    if (loaded && loaded.length > 0) {
+      const filtered = loaded.filter(e => e.toLowerCase().trim() !== 'joaovictor.rocha@kinross.com');
+      return Array.from(new Set([...filtered, ...defaultPartsOrderEmails]));
     }
-    return defaultKinrossEmails;
+    if (appSettings?.recipientEmails && appSettings.recipientEmails.length > 0) {
+      const filtered = appSettings.recipientEmails.filter(e => e.toLowerCase().trim() !== 'joaovictor.rocha@kinross.com');
+      return Array.from(new Set([...filtered, ...defaultPartsOrderEmails]));
+    }
+    return defaultPartsOrderEmails;
   });
 
   const currentRecipients = fixedEmails.length > 0
     ? fixedEmails
-    : defaultKinrossEmails;
+    : defaultPartsOrderEmails;
 
   const [formData, setFormData] = useState<PartsOrderSheet>(() => {
+    const rawSheetEmails = sheet?.recipientEmails && sheet.recipientEmails.length > 0
+      ? sheet.recipientEmails.filter(e => e.toLowerCase().trim() !== 'joaovictor.rocha@kinross.com')
+      : currentRecipients;
     return {
       ...sheet,
-      tag: sheet.tag || reportTag || '',
-      os: sheet.os || reportOs || '',
-      data: sheet.data || new Date().toISOString().split('T')[0],
-      recipientEmails: currentRecipients,
+      tag: sheet?.tag || reportTag || '',
+      os: sheet?.os || reportOs || '',
+      data: sheet?.data || new Date().toISOString().split('T')[0],
+      recipientEmails: rawSheetEmails.length > 0 ? rawSheetEmails : currentRecipients,
     };
   });
 
@@ -568,11 +576,11 @@ Oficina Central de Manutenção - Kinross Brasil Mineração`;
                   <button
                     type="button"
                     onClick={() => {
-                      defaultKinrossEmails.forEach((email) => handleAddRecipientEmail(email));
+                      defaultPartsOrderEmails.forEach((email) => handleAddRecipientEmail(email));
                     }}
                     className="text-amber-700 hover:underline font-bold cursor-pointer"
                   >
-                    Restaurar destinatários Kinross
+                    Restaurar destinatários ({defaultPartsOrderEmails.join(', ')})
                   </button>
                 </div>
               )}

@@ -216,19 +216,21 @@ const KEY_FIXED_PARTS_EMAILS = 'ais_parts_order_fixed_emails_v2';
 const IDB_KEY_FIXED_PARTS_EMAILS = 'parts_order_fixed_emails';
 
 export function loadFixedPartsOrderEmails(): string[] {
-  const defaultKinrossEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com', 'joaovictor.rocha@kinross.com'];
+  const defaultPartsOrderEmails = ['paulo.sousa@kinross.com', 'vitor.alves@kinross.com'];
   try {
     const raw = localStorage.getItem(KEY_FIXED_PARTS_EMAILS);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return Array.from(new Set([...parsed, ...defaultKinrossEmails]));
+        // Exclude joaovictor.rocha@kinross.com specifically from parts orders
+        const filtered = parsed.filter(e => typeof e === 'string' && e.toLowerCase().trim() !== 'joaovictor.rocha@kinross.com');
+        return Array.from(new Set([...filtered, ...defaultPartsOrderEmails]));
       }
     }
   } catch (e) {
     console.warn('[Storage] Error reading fixed parts emails from localStorage:', e);
   }
-  return defaultKinrossEmails;
+  return defaultPartsOrderEmails;
 }
 
 export async function saveFixedPartsOrderEmails(emails: string[]): Promise<boolean> {
